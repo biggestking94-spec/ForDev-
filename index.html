@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ForDev Studio | منصة أدوات التحويل والتغليف للمطورين</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- الشريط العلوي -->
+  <header class="navbar">
+    <div class="brand" id="homeBrand" style="cursor:pointer;">
+      <div class="logo-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+          <line x1="14" y1="4" x2="10" y2="20"></line>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>ForDev <span>Studio</span></h1>
+        <p data-i18n="subtitle">Developer Conversion & Packaging Hub</p>
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <button id="langToggle" class="btn btn-icon" title="تغيير اللغة / Switch Language">EN</button>
+      <button id="themeToggle" class="btn btn-icon" title="تبديل الوضع الليلي والنهاري" aria-label="Toggle Theme">
+        <svg id="sunIcon" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg id="moonIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- نبذة تعريفية عن المنصة -->
+  <section class="hero-section">
+    <div class="hero-content">
+      <span class="badge" data-i18n="badge">ForDev Studio v2.0</span>
+      <h2 data-i18n="heroTitle">أدوات عملية لتحويل الأكواد وتجهيز التطبيقات للمطورين</h2>
+      <p data-i18n="heroDesc">
+        منصة تجمع بين تحويل صيغ الأكواد البرمجية، ونقل واجهات الويب إلى أطر التطبيقات (مثل Kivy و Tkinter و Flutter)، وتجهيز تغليف مشاريع بايثون والويب للهواتف، مع معاينة مباشرة وتلوين للكود وحفظ تلقائي لبياناتك.
+      </p>
+    </div>
+  </section>
+
+  <!-- بوكسات الأدوات -->
+  <section class="tools-section">
+    <div class="section-heading">
+      <h3 data-i18n="toolsHeading">اختر الأداة المطلوبة</h3>
+    </div>
+
+    <div class="tools-grid" id="toolsGrid">
+      <!-- بوكس 1 -->
+      <article class="tool-card active" data-tool="syntax">
+        <div class="card-top">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="17 1 21 5 17 9"></polyline>
+              <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+              <polyline points="7 23 3 19 7 15"></polyline>
+              <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+            </svg>
+          </div>
+          <span class="card-tag">01</span>
+        </div>
+        <h4 data-i18n="toolSyntaxTitle">تحويل صيغ الأكواد</h4>
+        <p data-i18n="toolSyntaxDesc">تحويل المنطق والدوال بين Python و JavaScript و JSON وغيرها بضغطة زر.</p>
+      </article>
+
+      <!-- بوكس 2 -->
+      <article class="tool-card" data-tool="web-to-app">
+        <div class="card-top">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+          </div>
+          <span class="card-tag">02</span>
+        </div>
+        <h4 data-i18n="toolWebToAppTitle">الويب إلى تطبيقات (Kivy / Tkinter / Flutter)</h4>
+        <p data-i18n="toolWebToAppDesc">تحويل هياكل وعناصر الويب إلى مكونات واجهة في Kivy و Tkinter و Flutter و React Native.</p>
+      </article>
+
+      <!-- بوكس 3 -->
+      <article class="tool-card" data-tool="py-pack">
+        <div class="card-top">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+              <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+          </div>
+          <span class="card-tag">03</span>
+        </div>
+        <h4 data-i18n="toolPyPackTitle">تغليف كود بايثون لتطبيق هاتف (APK / App)</h4>
+        <p data-i18n="toolPyPackDesc">توليد ملف الإعداد وأوامر التغليف لتحويل سكربتات Python / Kivy إلى تطبيق هاتف.</p>
+      </article>
+
+      <!-- بوكس 4 -->
+      <article class="tool-card" data-tool="web-pack">
+        <div class="card-top">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+              <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+          </div>
+          <span class="card-tag">04</span>
+        </div>
+        <h4 data-i18n="toolWebPackTitle">تغليف كود الموقع (Web / App Wrapper)</h4>
+        <p data-i18n="toolWebPackDesc">تجهيز مشروع الويب للتغليف كـ PWA أو WebView مع ملف manifest وهيكلة جاهزة.</p>
+      </article>
+
+      <!-- بوكس 5 -->
+      <article class="tool-card" data-tool="formatter">
+        <div class="card-top">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="21" y1="10" x2="7" y2="10"></line>
+              <line x1="21" y1="6" x2="3" y2="6"></line>
+              <line x1="21" y1="14" x2="3" y2="14"></line>
+              <line x1="21" y1="18" x2="7" y2="18"></line>
+            </svg>
+          </div>
+          <span class="card-tag">05</span>
+        </div>
+        <h4 data-i18n="toolFormatTitle">تنسيق وتجميل الأكواد (Formatter)</h4>
+        <p data-i18n="toolFormatDesc">إعادة تنسيق وترتيب أكواد JSON و HTML و JavaScript بوضوح وسرعة.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- مساحة عمل الأداة النشطة -->
+  <section class="workspace-wrapper" id="workspaceSection">
+    <div class="workspace-topbar">
+      <div class="active-tool-info">
+        <span id="activeToolBadge" class="tool-pill">تحويل صيغ الأكواد</span>
+        <span id="activeToolHint" class="tool-hint">اكتب أو اختر مثالًا جاهزًا ثم اضغط على تحويل</span>
+      </div>
+      <button id="resetToolBtn" class="btn btn-secondary" title="إعادة ضبط الأداة الحالية">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+    <path d="M3 3v5h5"></path>
+  </svg>
+  <span data-i18n="resetTool">إعادة ضبط</span>
+</button>
+
+      <div class="topbar-actions">
+        <button id="sampleBtn" class="btn btn-secondary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          <span data-i18n="loadSample">مثال جاهز</span>
+        </button>
+        <button id="previewBtn" class="btn btn-secondary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <span data-i18n="previewBtn">معاينة</span>
+        </button>
+      </div>
+    </div>
+
+    <main class="workspace">
+      <!-- لوحة الإدخال -->
+      <section class="editor-panel">
+        <div class="panel-header">
+          <div class="lang-selector">
+            <label for="sourceLang" data-i18n="sourceLabel">المدخل:</label>
+            <select id="sourceLang"></select>
+          </div>
+          <div class="panel-tools">
+            <button id="pasteBtn" class="tool-btn" title="لصق الكود">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+              </svg>
+            </button>
+            <button id="clearBtn" class="tool-btn" title="مسح المحرر">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="code-container" dir="ltr">
+          <div id="sourceLines" class="line-numbers">1</div>
+          <textarea id="sourceCode" spellcheck="false" placeholder="// Paste or write your code here..."></textarea>
+        </div>
+
+        <div class="panel-footer">
+          <span id="sourceStats">0 أسطر | 0 حرف</span>
+        </div>
+      </section>
+
+      <!-- زر التحويل الأوسط -->
+      <div class="center-controls">
+        <button id="convertBtn" class="btn btn-primary">
+          <span data-i18n="convertBtn">تنفيذ</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </button>
+        <button id="swapBtn" class="btn btn-icon swap-btn" title="عكس الخيارات">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="17 1 21 5 17 9"></polyline>
+            <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+            <polyline points="7 23 3 19 7 15"></polyline>
+            <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- لوحة المخرجات مع تلوين الكود -->
+      <section class="editor-panel">
+        <div class="panel-header">
+          <div class="lang-selector">
+            <label for="targetLang" data-i18n="targetLabel">المخرج:</label>
+            <select id="targetLang"></select>
+          </div>
+          <div class="panel-tools">
+            <button id="copyBtn" class="tool-btn" title="نسخ النتيجة">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+            <button id="downloadBtn" class="tool-btn" title="تنزيل الملف">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="code-container output-container" dir="ltr">
+          <div id="targetLines" class="line-numbers">1</div>
+          <pre id="highlightedOutput" class="highlighted-code"><code></code></pre>
+          <textarea id="targetCode" class="hidden-output-raw" readonly aria-hidden="true"></textarea>
+        </div>
+
+        <div class="panel-footer">
+          <span id="targetStats">0 أسطر | 0 حرف</span>
+        </div>
+      </section>
+    </main>
+
+    <!-- نافذة المعاينة المباشرة -->
+    <section id="previewBox" class="preview-section hidden">
+      <div class="preview-header">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <h4 data-i18n="previewTitle">المعاينة المباشرة (Live Preview)</h4>
+        </div>
+        <button id="closePreviewBtn" class="tool-btn" title="إغلاق المعاينة">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <iframe id="previewFrame" class="preview-frame" sandbox="allow-scripts"></iframe>
+    </section>
+
+    <!-- ملاحظات تقنية -->
+    <section class="notes-section">
+      <div class="notes-card">
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.45rem; color:var(--accent);">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <h4 style="margin:0;" data-i18n="notesTitle">ملاحظات وإرشادات تقنية</h4>
+        </div>
+        <div id="notesContent" class="notes-body"></div>
+      </div>
+    </section>
+  </section>
+
+  <!-- التذييل -->
+  <footer class="site-footer">
+    <p>
+      <span data-i18n="developedBy">طور بواسطة</span>
+      <a href="https://dot-website-pio.vercel.app" target="_blank" rel="noopener noreferrer">DOT</a>
+    </p>
+  </footer>
+
+  <!-- إشعار -->
+  <div id="toast" class="toast"></div>
+
+  <script src="samples.js"></script>
+  <script src="converter.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
