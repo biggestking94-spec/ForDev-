@@ -37,6 +37,23 @@
   const moonIcon = document.getElementById("moonIcon");
   const toastEl = document.getElementById("toast");
 
+  // عناصر مدمج الـ 3 ملفات داخل أداة تحويل أكواد الويب
+  const web3Panel = document.getElementById("web3FilesMode");
+  const web3Tabs = web3Panel ? web3Panel.querySelectorAll(".w3-tab") : [];
+  const web3NameInput = document.getElementById("w3FileName");
+  const web3Editor = document.getElementById("w3Editor");
+  const web3SampleBtn = document.getElementById("w3LoadSample");
+  const web3PackBtn = document.getElementById("w3PackBtn");
+
+  const defaultWeb3Files = () => [
+    { name: "index.html", code: "" },
+    { name: "style.css", code: "" },
+    { name: "script.js", code: "" }
+  ];
+
+  let web3Files = defaultWeb3Files();
+  let web3ActiveIndex = 0;
+
   let state = {
     toolId: "syntax",
     uiLang: "ar",
@@ -203,8 +220,28 @@
     }
   }
 
+  function syncWeb3Visibility(toolId) {
+    if (!web3Panel) return;
+    web3Panel.style.display = toolId === "web-to-app" ? "block" : "none";
+  }
+
+  function renderWeb3Slot(index) {
+    if (!web3Panel || !web3NameInput || !web3Editor) return;
+    web3ActiveIndex = index;
+    web3Tabs.forEach((tab, i) => tab.classList.toggle("active", i === index));
+    web3NameInput.value = web3Files[index].name;
+    web3Editor.value = web3Files[index].code;
+  }
+
+  function resetWeb3Files() {
+    web3Files = defaultWeb3Files();
+    renderWeb3Slot(0);
+  }
+
   function selectTool(toolId, autoRun = true) {
     state.toolId = toolId;
+    syncWeb3Visibility(toolId);
+
     const cfg = TOOLS_CONFIG[toolId] || TOOLS_CONFIG.syntax;
 
     document.querySelectorAll(".tool-card").forEach((card) => {
@@ -353,6 +390,9 @@
   if (resetToolBtn) {
     resetToolBtn.addEventListener("click", () => {
       delete state.toolData[state.toolId];
+      if (state.toolId === "web-to-app") {
+        resetWeb3Files();
+      }
       selectTool(state.toolId, true);
       showToast(I18N[state.uiLang].resetDone);
     });
@@ -458,6 +498,54 @@
   langToggle.addEventListener("click", () => {
     applyUiLanguage(state.uiLang === "ar" ? "en" : "ar");
   });
+
+  // أحداث مدمج الـ 3 ملفات داخل أداة الويب
+  if (web3Panel) {
+    web3Tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        renderWeb3Slot(Number(tab.dataset.w3));
+      });
+    });
+
+    web3NameInput?.addEventListener("input", (e) => {
+      web3Files[web3ActiveIndex].name = e.target.value;
+    });
+
+    web3Editor?.addEventListener("input", (e) => {
+      web3Files[web3ActiveIndex].code = e.target.value;
+    });
+
+    web3SampleBtn?.addEventListener("click", () => {
+      web3Files = [
+        {
+          name: "index.html",
+          code: '<div class="card">\n  <h3>ForDev Studio</h3>\n  <button>Start</button>\n</div>'
+        },
+        {
+          name: "style.css",
+          code: ".card {\n  padding: 16px;\n  border-radius: 12px;\n}"
+        },
+        {
+          name: "script.js",
+          code: "console.log('3 web files bundled');"
+        }
+      ];
+      renderWeb3Slot(web3ActiveIndex);
+    });
+
+    web3PackBtn?.addEventListener("click", () => {
+      const combined = web3Files
+        .map((f, i) => `/* --- FILE ${i + 1}: ${f.name || `file_${i + 1}`} --- */\n${f.code}`)
+        .join("\n\n");
+
+      sourceCodeEl.value = combined;
+      updateLineNumbers(sourceCodeEl.value, sourceLinesEl);
+      updateStats(sourceCodeEl.value, sourceStatsEl);
+      runTool();
+    });
+
+    renderWeb3Slot(0);
+  }
 
   // التهيئة الأولية
   loadSavedState();

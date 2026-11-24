@@ -101,6 +101,7 @@
       </article>
 
       <!-- بوكس 2 -->
+      
       <article class="tool-card" data-tool="web-to-app">
         <div class="card-top">
           <div class="card-icon">
@@ -165,8 +166,24 @@
       </article>
     </div>
   </section>
+<section id="multiFilePackager" class="packager-box">
+
 
   <!-- مساحة عمل الأداة النشطة -->
+  <!-- يظهر فقط عند تفعيل وضع الـ 3 ملفات داخل أداة تحويل أكواد الويب -->
+<div id="web3FilesMode" class="web-3files-panel" style="display: none;">
+  <div class="web-3files-bar">
+    <button type="button" class="w3-tab active" data-w3="0">HTML</button>
+    <button type="button" class="w3-tab" data-w3="1">CSS</button>
+    <button type="button" class="w3-tab" data-w3="2">JS</button>
+    <button type="button" id="w3LoadSample" class="btn btn-secondary">مثال ويب</button>
+    <button type="button" id="w3PackBtn" class="btn">تجميع الـ 3 ملفات</button>
+  </div>
+
+  <input type="text" id="w3FileName" placeholder="اسم الملف (مثل: index.html)" />
+  <textarea id="w3Editor" rows="8" placeholder="اكتب كود الملف المحدد هنا..."></textarea>
+</div>
+
   <section class="workspace-wrapper" id="workspaceSection">
     <div class="workspace-topbar">
       <div class="active-tool-info">
