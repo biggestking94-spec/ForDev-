@@ -219,11 +219,12 @@
       previewBox.classList.add("hidden");
     }
   }
+const WEB3_SUPPORTED_TOOLS = new Set(["web-to-app", "web-pack", "format"]);
+function syncWeb3Visibility(toolId) {
+  if (!web3Panel) return;
+  web3Panel.style.display = WEB3_SUPPORTED_TOOLS.has(toolId) ? "block" : "none";
+}
 
-  function syncWeb3Visibility(toolId) {
-    if (!web3Panel) return;
-    web3Panel.style.display = toolId === "web-to-app" ? "block" : "none";
-  }
 
   function renderWeb3Slot(index) {
     if (!web3Panel || !web3NameInput || !web3Editor) return;
@@ -534,9 +535,37 @@
     });
 
     web3PackBtn?.addEventListener("click", () => {
-      const combined = web3Files
-        .map((f, i) => `/* --- FILE ${i + 1}: ${f.name || `file_${i + 1}`} --- */\n${f.code}`)
-        .join("\n\n");
+      const htmlCode = web3Files[0]?.code || "";
+      const cssCode = web3Files[1]?.code || "";
+      const jsCode = web3Files[2]?.code || "";
+
+      let combined = "";
+
+      if (state.toolId === "web-pack") {
+        combined = [
+          "<!DOCTYPE html>",
+          '<html lang="ar" dir="rtl">',
+          "<head>",
+          '  <meta charset="UTF-8" />',
+          '  <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+          "  <title>ForDev Web App</title>",
+          "  <style>",
+          cssCode,
+          "  </style>",
+          "</head>",
+          "<body>",
+          htmlCode,
+          "  <script>",
+          jsCode,
+          "  </script>",
+          "</body>",
+          "</html>"
+        ].join("\n");
+      } else {
+        combined = web3Files
+          .map((f, i) => `/* --- FILE ${i + 1}: ${f.name || `file_${i + 1}`} --- */\n${f.code}`)
+          .join("\n\n");
+      }
 
       sourceCodeEl.value = combined;
       updateLineNumbers(sourceCodeEl.value, sourceLinesEl);
