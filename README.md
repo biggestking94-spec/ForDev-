@@ -16,4 +16,4 @@
 * حفظ تلقائي للبيانات عند تحديث الصفحة.
 
 ## المطور
-طور بواسطة **DOT**: https://dot-website-pio.vercel.app
+طور بواسطة **DOT**: https://dot-website-poi.vercel.app/
