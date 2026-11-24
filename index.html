@@ -75,8 +75,8 @@
       </p>
     </div>
   </section>
-
-  <!-- بوكسات الأدوات -->
+<div id="tools">
+    <!-- بوكسات الأدوات -->
   <section class="tools-section">
     <div class="section-heading">
       <h3 data-i18n="toolsHeading">اختر الأداة المطلوبة</h3>
@@ -343,6 +343,53 @@
     </section>
   </section>
 
+
+</div>
+<nav id="bottomNavBar" class="bottom-nav" aria-label="التنقل السريع">
+  <button type="button" class="bnav-item active" data-bnav="tools">
+    <span class="bnav-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+      </svg>
+    </span>
+    <span class="bnav-label">الأدوات</span>
+  </button>
+
+  <button type="button" class="bnav-item" data-bnav="fonts">
+    <span class="bnav-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="4 7 4 4 20 4 20 7"/>
+        <line x1="9" y1="20" x2="15" y2="20"/>
+        <line x1="12" y1="4" x2="12" y2="20"/>
+      </svg>
+    </span>
+    <span class="bnav-label">الخطوط</span>
+  </button>
+
+  <button type="button" class="bnav-item" data-bnav="icons">
+    <span class="bnav-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+      </svg>
+    </span>
+    <span class="bnav-label">الأيقونات</span>
+  </button>
+
+  <button type="button" class="bnav-item" data-bnav="backgrounds">
+    <span class="bnav-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+    </span>
+    <span class="bnav-label">الخلفيات</span>
+  </button>
+</nav>
+
   <!-- التذييل -->
   <footer class="site-footer">
     <p>
@@ -350,9 +397,38 @@
       <a href="https://dot-website-poi.vercel.app/" target="_blank" rel="noopener noreferrer">DOT</a>
     </p>
   </footer>
+  
+  <section id="designAssetsSection" class="design-assets-section">
 
-  <!-- إشعار -->
-  <div id="toast" class="toast"></div>
+
+  <!-- تبويب الخطوط -->
+  <div id="assetPanelFonts" class="asset-panel active">
+    <div class="font-custom-tester">
+      <input
+        type="text"
+        id="fontLiveSampleInput"
+        placeholder="اكتب نصًا لتجربة الخطوط مباشرة — ForDev Studio 2026"
+      />
+    </div>
+    <div class="asset-grid"></div>
+  </div>
+
+  <!-- تبويب الأيقونات -->
+  <div id="assetPanelIcons" class="asset-panel">
+    <div class="asset-grid"></div>
+  </div>
+
+  <!-- تبويب الخلفيات -->
+  <div id="assetPanelBackgrounds" class="asset-panel">
+    <div class="asset-grid"></div>
+  </div>
+</section>
+
+
+  <script src="icons-library.js"></script>
+<script src="fonts-library.js"></script>
+<script src="backgrounds-library.js"></script>
+
 
   <script src="samples.js"></script>
   <script src="converter.js"></script>

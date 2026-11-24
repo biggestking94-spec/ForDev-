@@ -1,5 +1,7 @@
 (() => {
   const STORAGE_KEY = "fordev_studio_state_v2";
+  const WEB3_STORAGE_KEY = "fordev_v2_web3_files_v1";
+  const WEB3_SUPPORTED_TOOLS = new Set(["web-to-app", "web-pack", "format"]);
 
   const toolsGrid = document.getElementById("toolsGrid");
   const activeToolBadge = document.getElementById("activeToolBadge");
@@ -37,7 +39,7 @@
   const moonIcon = document.getElementById("moonIcon");
   const toastEl = document.getElementById("toast");
 
-  // عناصر مدمج الـ 3 ملفات داخل أداة تحويل أكواد الويب
+  // عناصر مدمج الـ 3 ملفات داخل أدوات الويب
   const web3Panel = document.getElementById("web3FilesMode");
   const web3Tabs = web3Panel ? web3Panel.querySelectorAll(".w3-tab") : [];
   const web3NameInput = document.getElementById("w3FileName");
@@ -128,12 +130,20 @@
     }
   };
 
+  let toastTimer = null;
+
   function showToast(msg) {
-    if (!toastEl) return;
+    if (!toastEl) {
+      console.info(msg);
+      return;
+    }
     toastEl.textContent = msg;
     toastEl.classList.add("show");
-    setTimeout(() => toastEl.classList.remove("show"), 2300);
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2300);
   }
+
+  window.showToast = showToast;
 
   function loadSavedState() {
     try {
@@ -163,6 +173,30 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
       // تجاهل أخطاء السعة
+    }
+  }
+
+  function saveWeb3Files() {
+    try {
+      localStorage.setItem(WEB3_STORAGE_KEY, JSON.stringify(web3Files));
+    } catch {
+      // تجاهل أخطاء السعة
+    }
+  }
+
+  function loadWeb3Files() {
+    try {
+      const raw = localStorage.getItem(WEB3_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length === 3) {
+        web3Files = parsed.map((item, idx) => ({
+          name: typeof item?.name === "string" ? item.name : defaultWeb3Files()[idx].name,
+          code: typeof item?.code === "string" ? item.code : ""
+        }));
+      }
+    } catch {
+      // تجاهل أخطاء التخزين
     }
   }
 
@@ -219,12 +253,11 @@
       previewBox.classList.add("hidden");
     }
   }
-const WEB3_SUPPORTED_TOOLS = new Set(["web-to-app", "web-pack", "format"]);
-function syncWeb3Visibility(toolId) {
-  if (!web3Panel) return;
-  web3Panel.style.display = WEB3_SUPPORTED_TOOLS.has(toolId) ? "block" : "none";
-}
 
+  function syncWeb3Visibility(toolId) {
+    if (!web3Panel) return;
+    web3Panel.style.display = WEB3_SUPPORTED_TOOLS.has(toolId) ? "block" : "none";
+  }
 
   function renderWeb3Slot(index) {
     if (!web3Panel || !web3NameInput || !web3Editor) return;
@@ -236,6 +269,11 @@ function syncWeb3Visibility(toolId) {
 
   function resetWeb3Files() {
     web3Files = defaultWeb3Files();
+    try {
+      localStorage.removeItem(WEB3_STORAGE_KEY);
+    } catch {
+      // تجاهل أخطاء التخزين
+    }
     renderWeb3Slot(0);
   }
 
@@ -351,7 +389,7 @@ function syncWeb3Visibility(toolId) {
     return map[targetLangEl.value] || "fordev-output.txt";
   }
 
-  // الأحداث
+  // أحداث الأدوات والمحرر
   toolsGrid.addEventListener("click", (e) => {
     const card = e.target.closest(".tool-card");
     if (card && card.dataset.tool) {
@@ -391,7 +429,7 @@ function syncWeb3Visibility(toolId) {
   if (resetToolBtn) {
     resetToolBtn.addEventListener("click", () => {
       delete state.toolData[state.toolId];
-      if (state.toolId === "web-to-app") {
+      if (WEB3_SUPPORTED_TOOLS.has(state.toolId)) {
         resetWeb3Files();
       }
       selectTool(state.toolId, true);
@@ -500,7 +538,7 @@ function syncWeb3Visibility(toolId) {
     applyUiLanguage(state.uiLang === "ar" ? "en" : "ar");
   });
 
-  // أحداث مدمج الـ 3 ملفات داخل أداة الويب
+  // أحداث مدمج الـ 3 ملفات داخل أدوات الويب
   if (web3Panel) {
     web3Tabs.forEach((tab) => {
       tab.addEventListener("click", () => {
@@ -510,10 +548,12 @@ function syncWeb3Visibility(toolId) {
 
     web3NameInput?.addEventListener("input", (e) => {
       web3Files[web3ActiveIndex].name = e.target.value;
+      saveWeb3Files();
     });
 
     web3Editor?.addEventListener("input", (e) => {
       web3Files[web3ActiveIndex].code = e.target.value;
+      saveWeb3Files();
     });
 
     web3SampleBtn?.addEventListener("click", () => {
@@ -531,6 +571,7 @@ function syncWeb3Visibility(toolId) {
           code: "console.log('3 web files bundled');"
         }
       ];
+      saveWeb3Files();
       renderWeb3Slot(web3ActiveIndex);
     });
 
@@ -573,12 +614,256 @@ function syncWeb3Visibility(toolId) {
       runTool();
     });
 
+    loadWeb3Files();
     renderWeb3Slot(0);
   }
+
+  // رسم مكتبات التصميم (الخطوط، الأيقونات، الخلفيات)
+  const fontsGridEl = document.querySelector("#assetPanelFonts .asset-grid");
+  const iconsGridEl = document.querySelector("#assetPanelIcons .asset-grid");
+  const backgroundsGridEl = document.querySelector("#assetPanelBackgrounds .asset-grid");
+  const fontSampleInput = document.getElementById("fontLiveSampleInput");
+
+  function attachCopyHandlers(container = document) {
+    container.querySelectorAll(".asset-copy-btn").forEach((btn) => {
+      if (btn.dataset.boundCopy === "1") return;
+      btn.dataset.boundCopy = "1";
+      btn.addEventListener("click", async () => {
+        const text = btn.dataset.copy || "";
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast(I18N[state.uiLang]?.copied || "تم النسخ");
+        } catch {
+          showToast("تعذر النسخ تلقائيًا");
+        }
+      });
+    });
+  }
+
+  function insertAssetIntoWeb3(targetIndex, snippet, label) {
+    if (!snippet) return;
+
+    if (!WEB3_SUPPORTED_TOOLS.has(state.toolId)) {
+      selectTool("web-pack", false);
+    }
+    syncWeb3Visibility(state.toolId);
+
+    const currentCode = web3Files[targetIndex]?.code || "";
+    const separator = currentCode.trim() ? "\n\n" : "";
+    web3Files[targetIndex].code = `${currentCode}${separator}${snippet}`;
+    saveWeb3Files();
+
+    renderWeb3Slot(targetIndex);
+    web3Panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    showToast(`تم إدراج ${label} في ${web3Files[targetIndex].name}`);
+  }
+
+  function attachAssetActions(container = document) {
+    container.querySelectorAll(".asset-copy-btn").forEach((btn) => {
+      if (btn.dataset.boundCopy === "1") return;
+      btn.dataset.boundCopy = "1";
+      btn.addEventListener("click", async () => {
+        const text = btn.dataset.copy || "";
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast(I18N[state.uiLang]?.copied || "تم النسخ");
+        } catch {
+          showToast("تعذر النسخ تلقائيًا");
+        }
+      });
+    });
+
+    container.querySelectorAll(".asset-insert-btn").forEach((btn) => {
+      if (btn.dataset.boundInsert === "1") return;
+      btn.dataset.boundInsert = "1";
+      btn.addEventListener("click", () => {
+        const text = btn.dataset.insert || "";
+        const targetIndex = Number(btn.dataset.targetSlot ?? 1);
+        const label = btn.dataset.label || "العنصر";
+        insertAssetIntoWeb3(targetIndex, text, label);
+      });
+    });
+  }
+
+  function renderDesignLibraries() {
+    if (fontsGridEl && Array.isArray(window.FONTS_LIBRARY)) {
+      fontsGridEl.innerHTML = window.FONTS_LIBRARY.map(
+        (font) => `
+          <div class="asset-card">
+            <div class="asset-preview font-live-text" style="font-family: ${font.family};">${font.sample}</div>
+            <div class="asset-title">${font.title}</div>
+            ${font.category ? `<div class="asset-meta">${font.category}</div>` : ""}
+            <div class="asset-actions">
+              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(font.css)}" data-encoded="1">نسخ CSS</button>
+              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(font.css)}" data-target-slot="1" data-label="الخط (${font.title})" data-encoded="1">إدراج CSS</button>
+            </div>
+          </div>
+        `
+      ).join("");
+    }
+
+    if (iconsGridEl && Array.isArray(window.ICONS_LIBRARY)) {
+      iconsGridEl.innerHTML = window.ICONS_LIBRARY.map(
+        (icon) => `
+          <div class="asset-card">
+            <div class="asset-preview">${icon.svg}</div>
+            <div class="asset-title">${icon.title}</div>
+            ${icon.category ? `<div class="asset-meta">${icon.category}</div>` : ""}
+            <div class="asset-actions">
+              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(icon.svg)}" data-encoded="1">نسخ SVG</button>
+              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(icon.svg)}" data-target-slot="0" data-label="الأيقونة (${icon.title})" data-encoded="1">إدراج HTML</button>
+            </div>
+          </div>
+        `
+      ).join("");
+    }
+
+    if (backgroundsGridEl && Array.isArray(window.BACKGROUNDS_LIBRARY)) {
+      backgroundsGridEl.innerHTML = window.BACKGROUNDS_LIBRARY.map(
+        (bg) => `
+          <div class="asset-card">
+            <div class="asset-preview" style="${bg.previewStyle}"></div>
+            <div class="asset-title">${bg.title}</div>
+            ${bg.category ? `<div class="asset-meta">${bg.category}</div>` : ""}
+            <div class="asset-actions">
+              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(bg.css)}" data-encoded="1">نسخ CSS</button>
+              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(bg.css)}" data-target-slot="1" data-label="الخلفية (${bg.title})" data-encoded="1">إدراج CSS</button>
+            </div>
+          </div>
+        `
+      ).join("");
+    }
+
+    const section = document.getElementById("designAssetsSection") || document;
+    section.querySelectorAll('[data-encoded="1"]').forEach((btn) => {
+      if (btn.dataset.copy) btn.dataset.copy = decodeURIComponent(btn.dataset.copy);
+      if (btn.dataset.insert) btn.dataset.insert = decodeURIComponent(btn.dataset.insert);
+      btn.removeAttribute("data-encoded");
+    });
+
+    attachAssetActions(section);
+  }
+
+  fontSampleInput?.addEventListener("input", (e) => {
+    const val = e.target.value.trim();
+    if (!val) return;
+    document.querySelectorAll(".font-live-text").forEach((el) => {
+      el.textContent = val;
+    });
+  });
+
+  // تشغيل التبويبات وشريط التنقل السفلي (نسخة تمرير مضمونة وبدون ReferenceError)
+  (() => {
+    const navItems = document.querySelectorAll("[data-bnav]");
+    const tabBtns = document.querySelectorAll("[data-asset-tab]");
+
+    function notifyUser(msg) {
+      if (typeof showToast === "function") {
+        showToast(msg);
+      } else if (typeof window.showToast === "function") {
+        window.showToast(msg);
+      } else {
+        console.info(msg);
+      }
+    }
+
+    function getPanelsMap() {
+      return {
+        fonts: document.getElementById("assetPanelFonts"),
+        icons: document.getElementById("assetPanelIcons"),
+        backgrounds: document.getElementById("assetPanelBackgrounds")
+      };
+    }
+
+    function activateAssetTab(tabKey) {
+      const panelsMap = getPanelsMap();
+      tabBtns.forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.assetTab === tabKey);
+      });
+
+      Object.entries(panelsMap).forEach(([key, panel]) => {
+        if (!panel) return;
+        const isMatch = key === tabKey;
+        panel.classList.toggle("active", isMatch);
+        panel.style.display = isMatch ? "block" : "none";
+      });
+    }
+
+    function setNavActive(key) {
+      navItems.forEach((item) => {
+        item.classList.toggle("active", item.dataset.bnav === key);
+      });
+    }
+
+    function scrollToElementSmart(el) {
+      if (!el) return false;
+
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      const rect = el.getBoundingClientRect();
+      const targetTop = Math.max(0, rect.top + window.scrollY - 12);
+      window.scrollTo({ top: targetTop, behavior: "smooth" });
+
+      let parent = el.parentElement;
+      while (parent && parent !== document.body) {
+        const style = window.getComputedStyle(parent);
+        const canScroll =
+          (style.overflowY === "auto" || style.overflowY === "scroll") &&
+          parent.scrollHeight > parent.clientHeight;
+        if (canScroll) {
+          parent.scrollTo({ top: el.offsetTop - 12, behavior: "smooth" });
+          break;
+        }
+        parent = parent.parentElement;
+      }
+
+      return true;
+    }
+
+    tabBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.dataset.assetTab;
+        activateAssetTab(key);
+        setNavActive(key);
+      });
+    });
+
+    navItems.forEach((item) => {
+      item.addEventListener("click", () => {
+        const target = item.dataset.bnav;
+        setNavActive(target);
+
+        if (target === "tools") {
+          const toolsEl =
+            document.getElementById("toolsGrid") ||
+            document.getElementById("workspaceSection") ||
+            document.querySelector("main");
+          scrollToElementSmart(toolsEl);
+          return;
+        }
+
+        const assetsEl = document.getElementById("designAssetsSection");
+        if (!assetsEl) {
+          notifyUser("أضف قسم #designAssetsSection في index.html أولًا");
+          return;
+        }
+
+        activateAssetTab(target);
+        scrollToElementSmart(assetsEl);
+      });
+    });
+
+    if (getPanelsMap().fonts) {
+      activateAssetTab("fonts");
+    }
+  })();
 
   // التهيئة الأولية
   loadSavedState();
   applyTheme(state.theme);
   applyUiLanguage(state.uiLang);
   selectTool(state.toolId, true);
+  renderDesignLibraries();
 })();
