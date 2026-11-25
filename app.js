@@ -69,7 +69,7 @@
       badge: "ForDev Studio v2.0",
       heroTitle: "أدوات عملية لتحويل الأكواد وتجهيز التطبيقات للمطورين",
       heroDesc:
-        "منصة تجمع بين تحويل صيغ الأكواد البرمجية، ونقل واجهات الويب إلى أطر التطبيقات (مثل Kivy و Tkinter و Flutter)، وتجهيز تغليف مشاريع بايثون والويب للهواتف، مع معاينة مباشرة وتلوين للكود وحفظ تلقائي لبياناتك.",
+        "منصة متكاملة للمطورين تجمع بين تحويل صيغ الأكواد ونقل واجهات الويب إلى أطر التطبيقات (Kivy و Tkinter و Flutter)، وتجهيز تغليف مشاريع بايثون والويب للهواتف، مع مكتبات موسّعة للخطوط والأيقونات والخلفيات، ومعاينة حية، وإدراج مباشر في مشروع الـ 3 ملفات، وتنقل سفلي سريع وحفظ تلقائي لبياناتك.",
       toolsHeading: "اختر الأداة المطلوبة",
       toolSyntaxTitle: "تحويل صيغ الأكواد",
       toolSyntaxDesc: "تحويل المنطق والدوال بين Python و JavaScript و JSON وغيرها بضغطة زر.",
@@ -101,7 +101,7 @@
       badge: "ForDev Studio v2.0",
       heroTitle: "Practical Tools for Code Conversion & App Packaging",
       heroDesc:
-        "A unified studio for converting programming languages, migrating web UI to Kivy, Tkinter, and Flutter, packaging Python and Web apps for mobile, with live preview, syntax highlighting, and auto-save.",
+        "A unified developer hub for converting code syntax, migrating web UI to Kivy, Tkinter, and Flutter, and packaging Python and Web apps for mobile—complete with expanded font, icon, and background libraries, live preview, direct 3-file insertion, bottom navigation, and auto-save.",
       toolsHeading: "Select a Tool",
       toolSyntaxTitle: "Code Syntax Converter",
       toolSyntaxDesc: "Convert functions and logic between Python, JavaScript, and JSON.",
