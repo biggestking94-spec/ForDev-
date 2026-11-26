@@ -54,6 +54,7 @@
 
   let web3Files = defaultWeb3Files();
   let web3ActiveIndex = 0;
+  let currentIconMode = "standard";
 
   let state = {
     toolId: "syntax",
@@ -101,7 +102,9 @@
       navTools: "الأدوات",
       navFonts: "الخطوط",
       navIcons: "الأيقونات",
-      navBackgrounds: "الخلفيات"
+      navBackgrounds: "الخلفيات",
+      standardIconsBtn: "أيقونات عادية",
+      illustrationIconsBtn: "أيقونات توضيحية"
     },
     en: {
       subtitle: "Developer Conversion & Packaging Hub",
@@ -141,7 +144,9 @@
       navTools: "Tools",
       navFonts: "Fonts",
       navIcons: "Icons",
-      navBackgrounds: "Backgrounds"
+      navBackgrounds: "Backgrounds",
+      standardIconsBtn: "Standard Icons",
+      illustrationIconsBtn: "Illustrations"
     }
   };
 
@@ -371,6 +376,13 @@
     if (fontSampleInput) {
       fontSampleInput.placeholder = dict.fontSamplePlaceholder;
     }
+
+    document.querySelectorAll('[data-icon-mode="standard"]').forEach((btn) => {
+      btn.textContent = dict.standardIconsBtn;
+    });
+    document.querySelectorAll('[data-icon-mode="illustrations"]').forEach((btn) => {
+      btn.textContent = dict.illustrationIconsBtn;
+    });
 
     document.querySelectorAll('[data-page-key="fonts"] .asset-copy-btn, #assetPanelFonts .asset-copy-btn').forEach((btn) => {
       btn.textContent = dict.copyCss;
@@ -725,6 +737,53 @@
     });
   }
 
+  function isIllustrationIcon(icon) {
+    const cat = String(icon?.category || "").toLowerCase();
+    const title = String(icon?.title || "").toLowerCase();
+    return (
+      cat.includes("undraw") ||
+      cat.includes("illustration") ||
+      cat.includes("توضيح") ||
+      title.includes("توضيح") ||
+      title.includes("illustration")
+    );
+  }
+
+  function renderIconsList(iconsGridEl) {
+    if (!iconsGridEl || !Array.isArray(window.ICONS_LIBRARY)) return;
+
+    const filtered = window.ICONS_LIBRARY.filter((icon) => {
+      const isIllus = isIllustrationIcon(icon);
+      return currentIconMode === "illustrations" ? isIllus : !isIllus;
+    });
+
+    iconsGridEl.innerHTML = filtered
+      .map((icon) => {
+        const isIllus = isIllustrationIcon(icon);
+        return `
+          <div class="asset-card">
+            <div class="asset-preview ${isIllus ? "undraw-illustration-preview" : ""}">${icon.svg}</div>
+            <div class="asset-title">${icon.title}</div>
+            ${icon.category ? `<div class="asset-meta">${icon.category}</div>` : ""}
+            <div class="asset-actions">
+              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(icon.svg)}" data-encoded="1">نسخ SVG</button>
+              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(icon.svg)}" data-target-slot="0" data-label="الأيقونة (${icon.title})" data-encoded="1">إدراج HTML</button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    iconsGridEl.querySelectorAll('[data-encoded="1"]').forEach((btn) => {
+      if (btn.dataset.copy) btn.dataset.copy = decodeURIComponent(btn.dataset.copy);
+      if (btn.dataset.insert) btn.dataset.insert = decodeURIComponent(btn.dataset.insert);
+      btn.removeAttribute("data-encoded");
+    });
+
+    attachAssetActions(iconsGridEl);
+    applyDesignAssetsLanguage(state.uiLang);
+  }
+
   function renderDesignLibraries() {
     const fontsGridEl =
       document.querySelector('[data-page-key="fonts"] .asset-grid') ||
@@ -753,19 +812,7 @@
     }
 
     if (iconsGridEl && Array.isArray(window.ICONS_LIBRARY)) {
-      iconsGridEl.innerHTML = window.ICONS_LIBRARY.map(
-        (icon) => `
-          <div class="asset-card">
-            <div class="asset-preview">${icon.svg}</div>
-            <div class="asset-title">${icon.title}</div>
-            ${icon.category ? `<div class="asset-meta">${icon.category}</div>` : ""}
-            <div class="asset-actions">
-              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(icon.svg)}" data-encoded="1">نسخ SVG</button>
-              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(icon.svg)}" data-target-slot="0" data-label="الأيقونة (${icon.title})" data-encoded="1">إدراج HTML</button>
-            </div>
-          </div>
-        `
-      ).join("");
+      renderIconsList(iconsGridEl);
     }
 
     if (backgroundsGridEl && Array.isArray(window.BACKGROUNDS_LIBRARY)) {
@@ -794,6 +841,21 @@
     attachAssetActions(rootScope);
     applyDesignAssetsLanguage(state.uiLang);
   }
+
+  document.addEventListener("click", (e) => {
+    const modeBtn = e.target.closest("[data-icon-mode]");
+    if (!modeBtn) return;
+
+    currentIconMode = modeBtn.dataset.iconMode || "standard";
+    document.querySelectorAll("[data-icon-mode]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.iconMode === currentIconMode);
+    });
+
+    const iconsGridEl =
+      document.querySelector('[data-page-key="icons"] .asset-grid') ||
+      document.querySelector("#assetPanelIcons .asset-grid");
+    renderIconsList(iconsGridEl);
+  });
 
   document.addEventListener("input", (e) => {
     if (e.target && e.target.id === "fontLiveSampleInput") {
@@ -846,6 +908,16 @@
         tester.className = "font-custom-tester";
         tester.innerHTML = `<input id="fontLiveSampleInput" type="text" placeholder="اكتب نصًا لتجربة الخطوط مباشرة — ForDev Studio 2026" />`;
         box.appendChild(tester);
+      }
+
+      if (key === "icons") {
+        const filterBar = document.createElement("div");
+        filterBar.className = "icon-mode-tabs";
+        filterBar.innerHTML = `
+          <button type="button" class="icon-mode-btn active" data-icon-mode="standard">أيقونات عادية</button>
+          <button type="button" class="icon-mode-btn" data-icon-mode="illustrations">أيقونات توضيحية</button>
+        `;
+        box.appendChild(filterBar);
       }
 
       const grid = sourcePanel ? sourcePanel.querySelector(".asset-grid") : null;

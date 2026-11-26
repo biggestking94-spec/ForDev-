@@ -841,3 +841,37 @@ textarea,
   transform: translateX(-50%) translateY(0);
   opacity: 1;
 }
+.undraw-illustration-preview {
+  min-height: 122px;
+  padding: 12px;
+}
+
+.undraw-illustration-preview svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+.icon-mode-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 14px;
+  flex-wrap: wrap;
+}
+
+.icon-mode-btn {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon-mode-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
