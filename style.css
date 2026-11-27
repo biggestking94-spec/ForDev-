@@ -856,6 +856,7 @@ textarea,
   gap: 8px;
   margin: 12px 0 14px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .icon-mode-btn {
