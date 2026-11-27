@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_KEY = "fordev_studio_state_v2";
   const WEB3_STORAGE_KEY = "fordev_v2_web3_files_v1";
+  const BUILD_CFG_STORAGE_KEY = "fordev_v2_build_config_v1";
   const WEB3_SUPPORTED_TOOLS = new Set(["web-to-app", "web-pack"]);
 
   const toolsGrid = document.getElementById("toolsGrid");
@@ -52,9 +53,18 @@
     { name: "script.js", code: "" }
   ];
 
+  const defaultBuildConfig = () => ({
+    appName: "ForDev App",
+    packageId: "com.dotking.fordevapp",
+    version: "1.0.0",
+    themeColor: "#3b82f6"
+  });
+
   let web3Files = defaultWeb3Files();
   let web3ActiveIndex = 0;
   let currentIconMode = "standard";
+  let isToolPageOpen = false;
+  let buildConfig = defaultBuildConfig();
 
   let state = {
     toolId: "syntax",
@@ -104,7 +114,17 @@
       navIcons: "الأيقونات",
       navBackgrounds: "الخلفيات",
       standardIconsBtn: "أيقونات عادية",
-      illustrationIconsBtn: "أيقونات توضيحية"
+      illustrationIconsBtn: "أيقونات توضيحية",
+      backToTools: "← رجوع إلى الأدوات",
+      buildTitle: "أداة البناء الحقيقية (Real Build)",
+      buildAppNameLabel: "اسم التطبيق",
+      buildPkgLabel: "معرّف الحزمة (Package ID)",
+      buildVersionLabel: "الإصدار",
+      buildColorLabel: "اللون الأساسي",
+      buildPwaBtn: "بناء وتنزيل حزمة PWA كاملة",
+      buildKotlinBtn: "توليد وتنزيل MainActivity.kt",
+      buildSpecBtn: "توليد وتنزيل buildozer.spec + build.sh",
+      buildWorkflowBtn: "توليد GitHub Action (APK)"
     },
     en: {
       subtitle: "Developer Conversion & Packaging Hub",
@@ -146,7 +166,17 @@
       navIcons: "Icons",
       navBackgrounds: "Backgrounds",
       standardIconsBtn: "Standard Icons",
-      illustrationIconsBtn: "Illustrations"
+      illustrationIconsBtn: "Illustrations",
+      backToTools: "← Back to Tools",
+      buildTitle: "Real Build Engine",
+      buildAppNameLabel: "App Name",
+      buildPkgLabel: "Package ID",
+      buildVersionLabel: "Version",
+      buildColorLabel: "Theme Color",
+      buildPwaBtn: "Build & Download PWA Bundle",
+      buildKotlinBtn: "Generate & Download MainActivity.kt",
+      buildSpecBtn: "Generate buildozer.spec + build.sh",
+      buildWorkflowBtn: "Generate GitHub Action (APK)"
     }
   };
 
@@ -164,6 +194,459 @@
   }
 
   window.showToast = showToast;
+
+  function loadBuildConfig() {
+    try {
+      const raw = localStorage.getItem(BUILD_CFG_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        buildConfig = { ...defaultBuildConfig(), ...parsed };
+      }
+    } catch {
+      // تجاهل أخطاء التخزين
+    }
+  }
+
+  function saveBuildConfig() {
+    try {
+      localStorage.setItem(BUILD_CFG_STORAGE_KEY, JSON.stringify(buildConfig));
+    } catch {
+      // تجاهل أخطاء السعة
+    }
+  }
+
+  function validateBuildInputs(cfg) {
+    const errors = [];
+    if (!cfg.appName || cfg.appName.trim().length < 2) {
+      errors.push("أدخل اسمًا صحيحًا للتطبيق (حرفان على الأقل).");
+    }
+    if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(String(cfg.packageId || "").trim())) {
+      errors.push("صيغة Package ID يجب أن تكون مثل: com.dotking.app");
+    }
+    return errors;
+  }
+
+  function triggerFileDownload(filename, content, mime = "text/plain;charset=utf-8") {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function buildManifestJson(cfg) {
+    return JSON.stringify(
+      {
+        name: cfg.appName.trim(),
+        short_name: cfg.appName.trim().slice(0, 12),
+        version: (cfg.version || "1.0.0").trim(),
+        start_url: "./index.html",
+        display: "standalone",
+        background_color: "#0b1120",
+        theme_color: cfg.themeColor || "#3b82f6",
+        icons: []
+      },
+      null,
+      2
+    );
+  }
+
+  function buildServiceWorkerJs(cfg) {
+    const cacheName = `${cfg.packageId.replace(/[^a-z0-9_]/gi, "_")}_${(cfg.version || "1.0.0").replace(/[^a-z0-9_]/gi, "_")}`;
+    return `const CACHE_NAME = "${cacheName}";
+const ASSETS = ["./", "./index.html", "./style.css", "./script.js", "./manifest.json"];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  event.respondWith(
+    caches.match(event.request).then((res) => res || fetch(event.request))
+  );
+});`;
+  }
+
+  function buildKotlinWebView(cfg, htmlContent = "") {
+    const pkg = cfg.packageId.trim();
+    const safeTitle = cfg.appName.trim().replace(/"/g, '\\"');
+    const hasInlineHtml = Boolean(htmlContent && htmlContent.trim());
+
+    return `package ${pkg}
+
+import android.annotation.SuppressLint
+import android.os.Bundle
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.appcompat.app.AppCompatActivity
+
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var webView: WebView
+
+    @SuppressLint("SetJavaScriptEnabled")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        title = "${safeTitle}"
+
+        webView = WebView(this)
+        setContentView(webView)
+
+        val settings: WebSettings = webView.settings
+        settings.javaScriptEnabled = true
+        settings.domStorageEnabled = true
+        settings.allowFileAccess = true
+        settings.mediaPlaybackRequiresUserGesture = false
+
+        webView.webViewClient = WebViewClient()
+
+        ${
+          hasInlineHtml
+            ? `webView.loadUrl("file:///android_asset/index.html")`
+            : `webView.loadUrl("https://example.com")`
+        }
+    }
+
+    override fun onBackPressed() {
+        if (this::webView.isInitialized && webView.canGoBack()) {
+            webView.goBack()
+        } else {
+            super.onBackPressed()
+        }
+    }
+}`;
+  }
+
+  function buildBuildozerSpec(cfg) {
+    const safeTitle = cfg.appName.trim().replace(/[^a-zA-Z0-9 _-]/g, "") || "ForDevApp";
+    const pkgDomain = cfg.packageId.trim().split(".")[0] || "org";
+    const pkgName = cfg.packageId.trim().replace(/[^a-z0-9]/gi, "").toLowerCase() || "fordevapp";
+    const ver = (cfg.version || "1.0.0").trim();
+
+    return `[app]
+title = ${safeTitle}
+package.name = ${pkgName}
+package.domain = ${pkgDomain}
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas,json,html,css,js
+version = ${ver}
+requirements = python3,kivy
+orientation = portrait
+fullscreen = 0
+android.permissions = INTERNET
+
+[buildozer]
+log_level = 2
+warn_on_root = 1`;
+  }
+
+  function buildBuildScriptSh() {
+    return `#!/usr/bin/env bash
+set -e
+echo "Checking build environment..."
+if command -v buildozer >/dev/null 2>&1; then
+  buildozer android debug
+else
+  echo "Buildozer not found. Install it or run via GitHub Actions workflow (.github/workflows/build-apk.yml)."
+fi`;
+  }
+
+  function buildGitHubWorkflowYml(cfg) {
+    const safeName = cfg.appName.trim().replace(/"/g, '\\"');
+    return `name: Build ForDev APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Buildozer dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+          pip install --upgrade pip wheel setuptools buildozer cython==0.29.36
+
+      - name: Build Android APK for ${safeName}
+        run: |
+          buildozer android debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${cfg.packageId.replace(/[^a-z0-9_.-]/gi, "_")}-apk
+          path: bin/*.apk`;
+  }
+
+  function exportPwaBundleNow() {
+    const errors = validateBuildInputs(buildConfig);
+    if (errors.length) {
+      showToast(errors[0]);
+      renderNotes(errors);
+      return;
+    }
+
+    const html = (web3Files[0]?.code || sourceCodeEl.value || "").trim();
+    const css = (web3Files[1]?.code || "").trim();
+    const js = (web3Files[2]?.code || "").trim();
+
+    const manifest = buildManifestJson(buildConfig);
+    const sw = buildServiceWorkerJs(buildConfig);
+    const indexHtml = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="${buildConfig.themeColor}" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="stylesheet" href="./style.css" />
+  <title>${buildConfig.appName.trim()}</title>
+</head>
+<body>
+${html || "<main><h1>ForDev App</h1></main>"}
+  <script src="./script.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./sw.js");
+    }
+  </script>
+</body>
+</html>`;
+
+    renderOutput(indexHtml);
+    renderNotes([
+      `تم تجهيز حزمة PWA حقيقية لتطبيق: ${buildConfig.appName.trim()} (${buildConfig.packageId.trim()})`,
+      "تم تنزيل ملفات: manifest.json و sw.js و index.html (بالإضافة إلى style.css و script.js إذا كان بهما كود)."
+    ]);
+
+    triggerFileDownload("manifest.json", manifest, "application/json;charset=utf-8");
+    setTimeout(() => triggerFileDownload("sw.js", sw, "application/javascript;charset=utf-8"), 140);
+    setTimeout(() => triggerFileDownload("index.html", indexHtml, "text/html;charset=utf-8"), 280);
+    if (css) setTimeout(() => triggerFileDownload("style.css", css, "text/css;charset=utf-8"), 420);
+    if (js) setTimeout(() => triggerFileDownload("script.js", js, "application/javascript;charset=utf-8"), 560);
+
+    showToast("تم بناء وتنزيل ملفات حزمة PWA بنجاح");
+  }
+
+  function exportKotlinWebViewNow() {
+    const errors = validateBuildInputs(buildConfig);
+    if (errors.length) {
+      showToast(errors[0]);
+      renderNotes(errors);
+      return;
+    }
+
+    const html = (web3Files[0]?.code || sourceCodeEl.value || "").trim();
+    const ktCode = buildKotlinWebView(buildConfig, html);
+    renderOutput(ktCode);
+    renderNotes([
+      `تم توليد MainActivity.kt للحزمة ${buildConfig.packageId.trim()}`,
+      "ضع MainActivity.kt في مجلد مشروع Android Studio/Kotlin، وإذا أدرجت HTML فضع index.html داخل مجلد assets."
+    ]);
+    triggerFileDownload("MainActivity.kt", ktCode, "text/plain;charset=utf-8");
+    showToast("تم تنزيل MainActivity.kt بنجاح");
+  }
+
+  function exportPythonBuildFilesNow() {
+    const errors = validateBuildInputs(buildConfig);
+    if (errors.length) {
+      showToast(errors[0]);
+      renderNotes(errors);
+      return;
+    }
+
+    const spec = buildBuildozerSpec(buildConfig);
+    const sh = buildBuildScriptSh();
+    renderOutput(spec);
+    renderNotes([
+      "تم توليد buildozer.spec و build.sh لتغليف تطبيق بايثون/Kivy.",
+      "يمكنك تشغيل البناء محليًا في بيئة Linux/Termux أو عبر GitHub Action."
+    ]);
+    triggerFileDownload("buildozer.spec", spec, "text/plain;charset=utf-8");
+    setTimeout(() => triggerFileDownload("build.sh", sh, "text/x-sh;charset=utf-8"), 150);
+    showToast("تم تنزيل buildozer.spec و build.sh");
+  }
+
+  function exportGitHubWorkflowNow() {
+    const errors = validateBuildInputs(buildConfig);
+    if (errors.length) {
+      showToast(errors[0]);
+      renderNotes(errors);
+      return;
+    }
+
+    const yml = buildGitHubWorkflowYml(buildConfig);
+    renderOutput(yml);
+    renderNotes([
+      "تم توليد ملف build-apk.yml الخاص بـ GitHub Actions.",
+      "ارفع الملف إلى المسار .github/workflows/build-apk.yml في مستودعك لبناء ملف APK تلقائيًا."
+    ]);
+    triggerFileDownload("build-apk.yml", yml, "text/yaml;charset=utf-8");
+    showToast("تم تنزيل build-apk.yml بنجاح");
+  }
+
+  window.ForDevRealBuilder = {
+    getConfig: () => ({ ...buildConfig }),
+    setConfig: (patch) => {
+      buildConfig = { ...buildConfig, ...(patch || {}) };
+      saveBuildConfig();
+    },
+    validate: validateBuildInputs,
+    exportPwaBundle: exportPwaBundleNow,
+    exportKotlinWebView: exportKotlinWebViewNow,
+    exportPythonBuild: exportPythonBuildFilesNow,
+    exportGitHubWorkflow: exportGitHubWorkflowNow
+  };
+
+  function ensureRealBuildPanel(workspaceSec) {
+    if (!workspaceSec || workspaceSec.querySelector("#fordevRealBuildPanel")) return;
+
+    const panel = document.createElement("div");
+    panel.id = "fordevRealBuildPanel";
+    panel.className = "fordev-real-build-panel";
+    panel.innerHTML = `
+      <div class="real-build-header">
+        <h3 id="rbTitle">${I18N[state.uiLang].buildTitle}</h3>
+      </div>
+      <div class="real-build-form">
+        <div class="rb-field">
+          <label id="rbAppNameLbl" for="rbAppName">${I18N[state.uiLang].buildAppNameLabel}</label>
+          <input id="rbAppName" type="text" value="${buildConfig.appName}" />
+        </div>
+        <div class="rb-field">
+          <label id="rbPkgLbl" for="rbPkgId">${I18N[state.uiLang].buildPkgLabel}</label>
+          <input id="rbPkgId" type="text" dir="ltr" value="${buildConfig.packageId}" />
+        </div>
+        <div class="rb-field">
+          <label id="rbVerLbl" for="rbVersion">${I18N[state.uiLang].buildVersionLabel}</label>
+          <input id="rbVersion" type="text" dir="ltr" value="${buildConfig.version}" />
+        </div>
+        <div class="rb-field">
+          <label id="rbColorLbl" for="rbThemeColor">${I18N[state.uiLang].buildColorLabel}</label>
+          <input id="rbThemeColor" type="color" value="${buildConfig.themeColor}" />
+        </div>
+      </div>
+      <div class="real-build-actions">
+        <button type="button" id="rbBuildPwaBtn" class="btn btn-primary">${I18N[state.uiLang].buildPwaBtn}</button>
+        <button type="button" id="rbBuildKotlinBtn" class="btn btn-secondary">${I18N[state.uiLang].buildKotlinBtn}</button>
+        <button type="button" id="rbBuildSpecBtn" class="btn btn-secondary">${I18N[state.uiLang].buildSpecBtn}</button>
+        <button type="button" id="rbBuildGhBtn" class="btn btn-secondary">${I18N[state.uiLang].buildWorkflowBtn}</button>
+      </div>
+    `;
+
+    const notesSec = workspaceSec.querySelector(".notes-section");
+    if (notesSec) {
+      workspaceSec.insertBefore(panel, notesSec);
+    } else {
+      workspaceSec.appendChild(panel);
+    }
+
+    const nameEl = panel.querySelector("#rbAppName");
+    const pkgEl = panel.querySelector("#rbPkgId");
+    const verEl = panel.querySelector("#rbVersion");
+    const colEl = panel.querySelector("#rbThemeColor");
+
+    const syncInputsToConfig = () => {
+      buildConfig.appName = nameEl.value;
+      buildConfig.packageId = pkgEl.value;
+      buildConfig.version = verEl.value;
+      buildConfig.themeColor = colEl.value;
+      saveBuildConfig();
+    };
+
+    nameEl?.addEventListener("input", syncInputsToConfig);
+    pkgEl?.addEventListener("input", syncInputsToConfig);
+    verEl?.addEventListener("input", syncInputsToConfig);
+    colEl?.addEventListener("input", syncInputsToConfig);
+
+    panel.querySelector("#rbBuildPwaBtn")?.addEventListener("click", () => {
+      syncInputsToConfig();
+      exportPwaBundleNow();
+    });
+
+    panel.querySelector("#rbBuildKotlinBtn")?.addEventListener("click", () => {
+      syncInputsToConfig();
+      exportKotlinWebViewNow();
+    });
+
+    panel.querySelector("#rbBuildSpecBtn")?.addEventListener("click", () => {
+      syncInputsToConfig();
+      exportPythonBuildFilesNow();
+    });
+
+    panel.querySelector("#rbBuildGhBtn")?.addEventListener("click", () => {
+      syncInputsToConfig();
+      exportGitHubWorkflowNow();
+    });
+  }
+
+  function applyRealBuildLanguage(lang) {
+    const dict = I18N[lang] || I18N.ar;
+    const setText = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+
+    setText("rbTitle", dict.buildTitle);
+    setText("rbAppNameLbl", dict.buildAppNameLabel);
+    setText("rbPkgLbl", dict.buildPkgLabel);
+    setText("rbVerLbl", dict.buildVersionLabel);
+    setText("rbColorLbl", dict.buildColorLabel);
+    setText("rbBuildPwaBtn", dict.buildPwaBtn);
+    setText("rbBuildKotlinBtn", dict.buildKotlinBtn);
+    setText("rbBuildSpecBtn", dict.buildSpecBtn);
+    setText("rbBuildGhBtn", dict.buildWorkflowBtn);
+  }
+
+  function syncHybridToolView() {
+    const toolsPage =
+      document.querySelector('.fordev-page-section[data-page-key="tools"]') ||
+      document.getElementById("fordevHorizontalStage")?.firstElementChild;
+    if (!toolsPage) return;
+    toolsPage.classList.toggle("tool-detail-open", isToolPageOpen);
+    toolsPage.scrollTop = 0;
+  }
+
+  function openToolSeparatePage(toolId, autoRun = true) {
+    if (!toolId) return;
+    selectTool(toolId, autoRun);
+    isToolPageOpen = true;
+    syncHybridToolView();
+    const toolsPage = document.querySelector('.fordev-page-section[data-page-key="tools"]');
+    if (toolsPage) {
+      toolsPage.classList.add("tool-detail-open");
+      toolsPage.scrollTop = 0;
+    }
+    if (typeof window.goToForDevSection === "function") {
+      window.goToForDevSection("tools");
+    }
+  }
+
+  function closeToolSeparatePage() {
+    isToolPageOpen = false;
+    syncHybridToolView();
+  }
+
+  window.openForDevToolPage = openToolSeparatePage;
+  window.closeForDevToolPage = closeToolSeparatePage;
 
   function loadSavedState() {
     try {
@@ -372,9 +855,14 @@
   function applyDesignAssetsLanguage(lang) {
     const dict = I18N[lang] || I18N.ar;
     const fontSampleInput = document.getElementById("fontLiveSampleInput");
+    const backBtn = document.getElementById("backToToolsBtn");
 
     if (fontSampleInput) {
       fontSampleInput.placeholder = dict.fontSamplePlaceholder;
+    }
+
+    if (backBtn) {
+      backBtn.textContent = dict.backToTools;
     }
 
     document.querySelectorAll('[data-icon-mode="standard"]').forEach((btn) => {
@@ -419,6 +907,8 @@
         labelEl.textContent = navLabelMap[key];
       }
     });
+
+    applyRealBuildLanguage(lang);
   }
 
   function applyUiLanguage(lang) {
@@ -464,12 +954,14 @@
     return map[targetLangEl.value] || "fordev-output.txt";
   }
 
-  toolsGrid.addEventListener("click", (e) => {
-    const card = e.target.closest(".tool-card");
-    if (card && card.dataset.tool) {
-      selectTool(card.dataset.tool, true);
-    }
-  });
+  if (toolsGrid) {
+    toolsGrid.addEventListener("click", (e) => {
+      const card = e.target.closest("[data-tool]");
+      if (card && card.dataset.tool) {
+        openToolSeparatePage(card.dataset.tool, true);
+      }
+    });
+  }
 
   convertBtn.addEventListener("click", runTool);
 
@@ -703,6 +1195,8 @@
     saveWeb3Files();
 
     renderWeb3Slot(targetIndex);
+    isToolPageOpen = true;
+    syncHybridToolView();
     if (typeof window.goToForDevSection === "function") {
       window.goToForDevSection("tools");
     }
@@ -843,6 +1337,18 @@
   }
 
   document.addEventListener("click", (e) => {
+    const card = e.target.closest("[data-tool]");
+    if (card && card.dataset.tool) {
+      e.preventDefault();
+      openToolSeparatePage(card.dataset.tool, true);
+      return;
+    }
+
+    if (e.target && e.target.closest("#backToToolsBtn")) {
+      closeToolSeparatePage();
+      return;
+    }
+
     const modeBtn = e.target.closest("[data-icon-mode]");
     if (!modeBtn) return;
 
@@ -867,16 +1373,18 @@
     }
   });
 
-  // بناء 4 أقسام مستقلة أفقية لكل قسم فوتر خاص "طور بواسطة DOT" ونهاية واضحة
+  // بناء الأقسام المستقلة الأفقية ولكل قسم فوتر خاص "طور بواسطة DOT" ونهاية واضحة
   (() => {
     const navItems = document.querySelectorAll("[data-bnav]");
     let stageEl = null;
     const sectionMap = {};
 
-    function appendSectionFooter(sectionEl) {
-      if (!sectionEl || sectionEl.querySelector(".section-end-footer")) return;
+    function appendSectionFooter(sectionEl, extraClass = "") {
+      if (!sectionEl) return;
+      const selector = extraClass ? `.section-end-footer.${extraClass}` : ".section-end-footer:not(.tool-detail-footer)";
+      if (sectionEl.querySelector(selector)) return;
       const footer = document.createElement("footer");
-      footer.className = "section-end-footer";
+      footer.className = extraClass ? `section-end-footer ${extraClass}` : "section-end-footer";
       footer.textContent = "طور بواسطة DOT";
       sectionEl.appendChild(footer);
     }
@@ -888,6 +1396,14 @@
         ws.appendChild(web3Panel);
       }
       syncWeb3Visibility(state.toolId);
+    }
+
+    function ensureToolBackBar(workspaceSec) {
+      if (!workspaceSec || workspaceSec.querySelector(".tool-back-bar")) return;
+      const bar = document.createElement("div");
+      bar.className = "tool-back-bar";
+      bar.innerHTML = `<button type="button" id="backToToolsBtn" class="btn btn-secondary">← رجوع إلى الأدوات</button>`;
+      workspaceSec.insertBefore(bar, workspaceSec.firstChild);
     }
 
     function createStandaloneAssetSection(key, titleAr, sourcePanel) {
@@ -954,9 +1470,14 @@
 
       if (hero) toolsPage.appendChild(hero);
       if (toolsSec) toolsPage.appendChild(toolsSec);
-      if (workspaceSec) toolsPage.appendChild(workspaceSec);
+      if (workspaceSec) {
+        ensureToolBackBar(workspaceSec);
+        ensureRealBuildPanel(workspaceSec);
+        toolsPage.appendChild(workspaceSec);
+      }
       placeWeb3InsideToolsPage(toolsPage);
       appendSectionFooter(toolsPage);
+      appendSectionFooter(toolsPage, "tool-detail-footer");
 
       const fontsPanel = document.getElementById("assetPanelFonts");
       const iconsPanel = document.getElementById("assetPanelIcons");
@@ -1027,7 +1548,10 @@
     navItems.forEach((item) => {
       item.addEventListener("click", () => {
         const key = item.dataset.bnav;
-        if (key) {
+        if (key && key !== "editor") {
+          if (key === "tools") {
+            closeToolSeparatePage();
+          }
           goToSectionHorizontal(key);
         }
       });
@@ -1035,11 +1559,14 @@
   })();
 
   // التهيئة الأولية المرتبة
+  loadBuildConfig();
   loadSavedState();
   applyTheme(state.theme);
   applyUiLanguage(state.uiLang);
   selectTool(state.toolId, true);
   window.initForDevPages();
   window.setForDevNavActive("tools");
+  isToolPageOpen = false;
+  syncHybridToolView();
   renderDesignLibraries();
 })();

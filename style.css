@@ -62,7 +62,14 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-.hidden {
+.hidden,
+.fordev-page-section[data-page-key="editor"],
+.bnav-item[data-bnav="editor"],
+.fordev-editor-hub-bar,
+.gemini-fixer-row,
+#rbGeminiKey,
+#rbGeminiSaveBtn,
+#rbGeminiFixBtn {
   display: none !important;
 }
 
@@ -180,6 +187,35 @@ body {
 body > .site-footer,
 #fordevHorizontalStage > .site-footer {
   display: none !important;
+}
+
+/* النظام الهجين لفتح الأداة في صفحة منفصلة */
+.fordev-page-section[data-page-key="tools"]:not(.tool-detail-open) .workspace-wrapper,
+.fordev-page-section[data-page-key="tools"]:not(.tool-detail-open) #web3FilesMode,
+.fordev-page-section[data-page-key="tools"]:not(.tool-detail-open) .tool-detail-footer {
+  display: none !important;
+}
+
+.fordev-page-section[data-page-key="tools"].tool-detail-open .workspace-wrapper {
+  display: block !important;
+}
+
+.fordev-page-section[data-page-key="tools"].tool-detail-open .hero-section,
+.fordev-page-section[data-page-key="tools"].tool-detail-open .tools-section,
+.fordev-page-section[data-page-key="tools"].tool-detail-open > .section-end-footer {
+  display: none !important;
+}
+
+.tool-back-bar {
+  display: none;
+  margin-bottom: 0.75rem;
+}
+
+.fordev-page-section[data-page-key="tools"].tool-detail-open .tool-back-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 /* الأزرار */
@@ -544,6 +580,56 @@ textarea,
   flex-wrap: wrap;
 }
 
+/* لوحة البناء الحقيقية */
+.fordev-real-build-panel {
+  margin-top: 1rem;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.real-build-header h3 {
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.real-build-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.rb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.rb-field label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.rb-field input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-editor);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.real-build-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .preview-section {
   margin-top: 1rem;
   background-color: var(--bg-panel);
@@ -703,6 +789,32 @@ textarea,
   font-size: 14px;
 }
 
+/* زرّا تبديل الأيقونات العادية والتوضيحية */
+.icon-mode-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 14px;
+  flex-wrap: wrap;
+}
+
+.icon-mode-btn {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon-mode-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .asset-grid {
   display: flex;
   flex-direction: column;
@@ -734,9 +846,25 @@ textarea,
   overflow: hidden;
 }
 
+.undraw-illustration-preview {
+  min-height: 122px;
+  padding: 12px;
+}
+
+.undraw-illustration-preview svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
 .asset-title {
   font-size: 14px;
   font-weight: 600;
+}
+
+.asset-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .asset-actions {
@@ -840,39 +968,4 @@ textarea,
 .toast.show {
   transform: translateX(-50%) translateY(0);
   opacity: 1;
-}
-.undraw-illustration-preview {
-  min-height: 122px;
-  padding: 12px;
-}
-
-.undraw-illustration-preview svg {
-  max-width: 100%;
-  height: auto;
-  display: block;
-}
-.icon-mode-tabs {
-  display: flex;
-  gap: 8px;
-  margin: 12px 0 14px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.icon-mode-btn {
-  padding: 8px 16px;
-  border-radius: 10px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-card);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.icon-mode-btn.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
 }
