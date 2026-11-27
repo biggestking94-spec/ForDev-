@@ -1,8 +1,38 @@
 (() => {
-  const STORAGE_KEY = "fordev_studio_state_v2";
+  const STORAGE_KEY = "fordev_studio_state_v4";
   const WEB3_STORAGE_KEY = "fordev_v2_web3_files_v1";
   const BUILD_CFG_STORAGE_KEY = "fordev_v2_build_config_v1";
+  const GEMINI_KEY_STORAGE = "fordev_v2_gemini_api_key";
+  const ACTIVE_FILE_STORAGE = "fordev_active_editor_file_v1";
   const WEB3_SUPPORTED_TOOLS = new Set(["web-to-app", "web-pack"]);
+
+  const SUPPORTED_10_LANGS = [
+    { id: "html", label: "HTML", ext: "html" },
+    { id: "css", label: "CSS", ext: "css" },
+    { id: "javascript", label: "JavaScript", ext: "js" },
+    { id: "typescript", label: "TypeScript", ext: "ts" },
+    { id: "python", label: "Python", ext: "py" },
+    { id: "json", label: "JSON", ext: "json" },
+    { id: "dart", label: "Dart / Flutter", ext: "dart" },
+    { id: "kotlin", label: "Kotlin", ext: "kt" },
+    { id: "php", label: "PHP", ext: "php" },
+    { id: "sql", label: "SQL", ext: "sql" },
+    { id: "xml", label: "XML / SVG", ext: "xml" }
+  ];
+
+  const LANG_SUGGESTIONS = {
+    html: ["div", "section", "button", "input", "h1", "p", "a", "img", "script", "style", "class=", "id="],
+    css: ["display: flex;", "justify-content: center;", "align-items: center;", "background:", "color:", "border-radius:", "padding:", "margin:"],
+    javascript: ["const", "let", "function", "async", "await", "return", "document.getElementById", "addEventListener", "console.log", "fetch"],
+    typescript: ["interface", "type", "const", "let", "function", "async", "Promise", "string", "number", "boolean"],
+    python: ["def", "class", "import", "from", "return", "if", "elif", "else", "for", "while", "in", "print"],
+    json: ['"name":', '"version":', '"description":', '"dependencies":', "true", "false", "null"],
+    dart: ["Widget build(BuildContext context)", "Container", "Column", "Row", "Text", "ElevatedButton", "final", "const"],
+    kotlin: ["fun main()", "class MainActivity", "override fun onCreate", "val", "var", "println"],
+    php: ["<?php", "function", "echo", "$", "array", "return", "if", "foreach"],
+    sql: ["SELECT", "FROM", "WHERE", "INSERT INTO", "UPDATE", "DELETE FROM", "JOIN", "ORDER BY"],
+    xml: ["<manifest", "<application", "<activity", "xmlns:android=", "android:name="]
+  };
 
   const toolsGrid = document.getElementById("toolsGrid");
   const activeToolBadge = document.getElementById("activeToolBadge");
@@ -10,29 +40,11 @@
 
   const sourceLangEl = document.getElementById("sourceLang");
   const targetLangEl = document.getElementById("targetLang");
-  const sourceCodeEl = document.getElementById("sourceCode");
   const targetCodeEl = document.getElementById("targetCode");
   const highlightedOutputEl = document.getElementById("highlightedOutput");
-
-  const sourceLinesEl = document.getElementById("sourceLines");
   const targetLinesEl = document.getElementById("targetLines");
-  const sourceStatsEl = document.getElementById("sourceStats");
   const targetStatsEl = document.getElementById("targetStats");
   const notesContentEl = document.getElementById("notesContent");
-
-  const convertBtn = document.getElementById("convertBtn");
-  const swapBtn = document.getElementById("swapBtn");
-  const sampleBtn = document.getElementById("sampleBtn");
-  const resetToolBtn = document.getElementById("resetToolBtn");
-  const previewBtn = document.getElementById("previewBtn");
-  const closePreviewBtn = document.getElementById("closePreviewBtn");
-  const previewBox = document.getElementById("previewBox");
-  const previewFrame = document.getElementById("previewFrame");
-
-  const pasteBtn = document.getElementById("pasteBtn");
-  const clearBtn = document.getElementById("clearBtn");
-  const copyBtn = document.getElementById("copyBtn");
-  const downloadBtn = document.getElementById("downloadBtn");
 
   const themeToggle = document.getElementById("themeToggle");
   const langToggle = document.getElementById("langToggle");
@@ -40,31 +52,27 @@
   const moonIcon = document.getElementById("moonIcon");
   const toastEl = document.getElementById("toast");
 
-  const web3Panel = document.getElementById("web3FilesMode");
-  const web3Tabs = web3Panel ? web3Panel.querySelectorAll(".w3-tab") : [];
-  const web3NameInput = document.getElementById("w3FileName");
-  const web3Editor = document.getElementById("w3Editor");
-  const web3SampleBtn = document.getElementById("w3LoadSample");
-  const web3PackBtn = document.getElementById("w3PackBtn");
+  const defaultCurrentFile = () => ({
+    name: "untitled.js",
+    lang: "javascript",
+    code: ""
+  });
 
-  const defaultWeb3Files = () => [
-    { name: "index.html", code: "" },
-    { name: "style.css", code: "" },
-    { name: "script.js", code: "" }
-  ];
-
-  const defaultBuildConfig = () => ({
+  // ملف واحد فقط يُفتح عندما يحرر المستخدم داخله (بدون شريط تبويبات جاهزة)
+  let currentFile = defaultCurrentFile();
+  let currentIconMode = "standard";
+  let isToolPageOpen = false;
+  let buildConfig = {
     appName: "ForDev App",
     packageId: "com.dotking.fordevapp",
     version: "1.0.0",
     themeColor: "#3b82f6"
-  });
-
-  let web3Files = defaultWeb3Files();
-  let web3ActiveIndex = 0;
-  let currentIconMode = "standard";
-  let isToolPageOpen = false;
-  let buildConfig = defaultBuildConfig();
+  };
+  let geminiApiKey = "";
+  let foldedLines = new Set();
+  let selectedLines = new Set();
+  let currentSuggestions = [];
+  let selectedSuggestionIdx = 0;
 
   let state = {
     toolId: "syntax",
@@ -76,117 +84,78 @@
   const I18N = {
     ar: {
       subtitle: "Developer Conversion & Packaging Hub",
-      badge: "ForDev Studio v2.0",
+      badge: "ForDev Studio v4.0",
       heroTitle: "أدوات عملية لتحويل الأكواد وتجهيز التطبيقات للمطورين",
-      heroDesc: "منصة متكاملة للمطورين تجمع بين تحويل صيغ الأكواد ونقل واجهات الويب إلى أطر التطبيقات، مع مكتبات الخطوط والأيقونات والخلفيات، ومعاينة حية، وحفظ تلقائي.",
+      heroDesc: "منصة متكاملة للمطورين تجمع بين تحويل صيغ الأكواد ونقل واجهات الويب إلى أطر التطبيقات، مع محرر بأسلوب Spck ومكتبات الخطوط والأيقونات والخلفيات.",
       toolsHeading: "اختر الأداة المطلوبة",
-      toolSyntaxTitle: "تحويل صيغ الأكواد",
-      toolSyntaxDesc: "تحويل المنطق والدوال بين Python و JavaScript و JSON وغيرها بضغطة زر.",
-      toolWebToAppTitle: "الويب إلى تطبيقات (Kivy / Tkinter / Flutter)",
-      toolWebToAppDesc: "تحويل هياكل وعناصر الويب إلى مكونات واجهة في Kivy و Tkinter و Flutter و React Native.",
-      toolPyPackTitle: "تغليف كود بايثون لتطبيق هاتف (APK / App)",
-      toolPyPackDesc: "توليد ملف الإعداد وأوامر التغليف لتحويل سكربتات Python / Kivy إلى تطبيق هاتف.",
-      toolWebPackTitle: "تغليف كود الموقع (Web / App Wrapper)",
-      toolWebPackDesc: "تجهيز مشروع الويب للتغليف كـ PWA أو WebView مع ملف manifest وهيكلة جاهزة.",
-      toolFormatTitle: "تنسيق وتجميل الأكواد (Formatter)",
-      toolFormatDesc: "إعادة تنسيق وترتيب أكواد JSON و HTML و JavaScript بوضوح وسرعة.",
-      loadSample: "مثال جاهز",
-      resetTool: "إعادة ضبط",
-      previewBtn: "معاينة",
-      sourceLabel: "المدخل:",
-      targetLabel: "المخرج:",
-      convertBtn: "تنفيذ",
-      previewTitle: "المعاينة المباشرة (Live Preview)",
-      notesTitle: "ملاحظات وإرشادات تقنية",
-      developedBy: "طور بواسطة",
       copied: "تم نسخ النتيجة إلى الحافظة",
-      pasted: "تم لصق الكود",
       cleared: "تم مسح المحرر",
-      resetDone: "تمت إعادة ضبط الأداة",
-      downloaded: "تم تنزيل الملف بنجاح",
-      fontSamplePlaceholder: "اكتب نصًا لتجربة الخطوط مباشرة — ForDev Studio 2026",
-      copyCss: "نسخ CSS",
-      copySvg: "نسخ SVG",
-      insertCss: "إدراج CSS",
-      insertHtml: "إدراج HTML",
       navTools: "الأدوات",
       navFonts: "الخطوط",
       navIcons: "الأيقونات",
+      navEditor: "المحرر",
       navBackgrounds: "الخلفيات",
       standardIconsBtn: "أيقونات عادية",
       illustrationIconsBtn: "أيقونات توضيحية",
-      backToTools: "← رجوع إلى الأدوات",
-      buildTitle: "أداة البناء الحقيقية (Real Build)",
-      buildAppNameLabel: "اسم التطبيق",
-      buildPkgLabel: "معرّف الحزمة (Package ID)",
-      buildVersionLabel: "الإصدار",
-      buildColorLabel: "اللون الأساسي",
-      buildPwaBtn: "بناء وتنزيل حزمة PWA كاملة",
-      buildKotlinBtn: "توليد وتنزيل MainActivity.kt",
-      buildSpecBtn: "توليد وتنزيل buildozer.spec + build.sh",
-      buildWorkflowBtn: "توليد GitHub Action (APK)"
+      backToTools: "خروج من الأداة",
+      foldBtn: "طي الكتل",
+      livePreviewBtn: "معاينة",
+      insertIconBtn: "+ أيقونة",
+      insertFontBtn: "+ خط",
+      insertBgBtn: "+ خلفية",
+      newFileBtn: "ملف جديد",
+      selectLineBtn: "تحديد سطر",
+      selectRangeBtn: "تحديد نطاق",
+      clearSelectBtn: "إلغاء التحديد",
+      copyLinesBtn: "نسخ المحدد",
+      deleteLinesBtn: "حذف المحدد",
+      geminiKeyPlaceholder: "Gemini API Key...",
+      geminiSaveKey: "حفظ",
+      geminiFixBtn: "فحص وتصحيح Gemini",
+      geminiFixing: "جاري الفحص...",
+      geminiMissingKey: "أدخل Gemini API Key أولاً",
+      geminiFixedToast: "تم فحص وتصحيح الكود بواسطة Gemini"
     },
     en: {
       subtitle: "Developer Conversion & Packaging Hub",
-      badge: "ForDev Studio v2.0",
+      badge: "ForDev Studio v4.0",
       heroTitle: "Practical Tools for Code Conversion & App Packaging",
-      heroDesc: "A unified developer hub for converting code syntax, migrating web UI to Kivy, Tkinter, and Flutter, and packaging Python and Web apps for mobile.",
+      heroDesc: "A unified developer hub for code conversion, app packaging, live editor, fonts, icons, illustrations, and backgrounds.",
       toolsHeading: "Select a Tool",
-      toolSyntaxTitle: "Code Syntax Converter",
-      toolSyntaxDesc: "Convert functions and logic between Python, JavaScript, and JSON.",
-      toolWebToAppTitle: "Web to Mobile/Desktop UI",
-      toolWebToAppDesc: "Convert HTML layouts into Kivy, Tkinter, Flutter, or React Native widgets.",
-      toolPyPackTitle: "Python to Mobile App (APK / App)",
-      toolPyPackDesc: "Generate buildozer.spec and build commands to package Python apps.",
-      toolWebPackTitle: "Website Wrapper & PWA Packager",
-      toolWebPackDesc: "Prepare your website as an installable PWA or Android WebView wrapper.",
-      toolFormatTitle: "Code Formatter & Beautifier",
-      toolFormatDesc: "Format and indent JSON, HTML, and JavaScript cleanly.",
-      loadSample: "Load Sample",
-      resetTool: "Reset",
-      previewBtn: "Preview",
-      sourceLabel: "Input:",
-      targetLabel: "Output:",
-      convertBtn: "Run",
-      previewTitle: "Live Preview",
-      notesTitle: "Technical Notes & Guidelines",
-      developedBy: "Developed by",
-      copied: "Output copied to clipboard",
-      pasted: "Code pasted",
+      copied: "Copied to clipboard",
       cleared: "Editor cleared",
-      resetDone: "Tool reset to default",
-      downloaded: "File downloaded successfully",
-      fontSamplePlaceholder: "Type text to preview fonts live — ForDev Studio 2026",
-      copyCss: "Copy CSS",
-      copySvg: "Copy SVG",
-      insertCss: "Insert CSS",
-      insertHtml: "Insert HTML",
       navTools: "Tools",
       navFonts: "Fonts",
       navIcons: "Icons",
+      navEditor: "Editor",
       navBackgrounds: "Backgrounds",
       standardIconsBtn: "Standard Icons",
       illustrationIconsBtn: "Illustrations",
-      backToTools: "← Back to Tools",
-      buildTitle: "Real Build Engine",
-      buildAppNameLabel: "App Name",
-      buildPkgLabel: "Package ID",
-      buildVersionLabel: "Version",
-      buildColorLabel: "Theme Color",
-      buildPwaBtn: "Build & Download PWA Bundle",
-      buildKotlinBtn: "Generate & Download MainActivity.kt",
-      buildSpecBtn: "Generate buildozer.spec + build.sh",
-      buildWorkflowBtn: "Generate GitHub Action (APK)"
+      backToTools: "Exit Tool",
+      foldBtn: "Fold",
+      livePreviewBtn: "Preview",
+      insertIconBtn: "+ Icon",
+      insertFontBtn: "+ Font",
+      insertBgBtn: "+ BG",
+      newFileBtn: "New File",
+      selectLineBtn: "Select Line",
+      selectRangeBtn: "Select Range",
+      clearSelectBtn: "Clear Sel",
+      copyLinesBtn: "Copy Sel",
+      deleteLinesBtn: "Delete Sel",
+      geminiKeyPlaceholder: "Gemini API Key...",
+      geminiSaveKey: "Save",
+      geminiFixBtn: "Fix with Gemini",
+      geminiFixing: "Fixing...",
+      geminiMissingKey: "Enter Gemini API Key first",
+      geminiFixedToast: "Code checked and fixed by Gemini"
     }
   };
 
   let toastTimer = null;
 
   function showToast(msg) {
-    if (!toastEl) {
-      console.info(msg);
-      return;
-    }
+    if (!toastEl) return;
     toastEl.textContent = msg;
     toastEl.classList.add("show");
     if (toastTimer) clearTimeout(toastTimer);
@@ -195,449 +164,528 @@
 
   window.showToast = showToast;
 
-  function loadBuildConfig() {
+  function escapeHtml(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function saveCurrentFile() {
     try {
-      const raw = localStorage.getItem(BUILD_CFG_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        buildConfig = { ...defaultBuildConfig(), ...parsed };
+      localStorage.setItem(ACTIVE_FILE_STORAGE, JSON.stringify(currentFile));
+    } catch {
+      // تجاهل
+    }
+  }
+
+  function loadCurrentFile() {
+    try {
+      const raw = localStorage.getItem(ACTIVE_FILE_STORAGE);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        currentFile = {
+          name: parsed.name || "untitled.js",
+          lang: parsed.lang || "javascript",
+          code: typeof parsed.code === "string" ? parsed.code : ""
+        };
       }
     } catch {
-      // تجاهل أخطاء التخزين
+      // تجاهل
     }
   }
 
-  function saveBuildConfig() {
-    try {
-      localStorage.setItem(BUILD_CFG_STORAGE_KEY, JSON.stringify(buildConfig));
-    } catch {
-      // تجاهل أخطاء السعة
-    }
+  function openNewFile(langId = "javascript", customName = "") {
+    const meta = SUPPORTED_10_LANGS.find((l) => l.id === langId) || SUPPORTED_10_LANGS[2];
+    const cleanName = (customName || "").trim() || `script_${Date.now().toString().slice(-4)}.${meta.ext}`;
+    currentFile = {
+      name: cleanName,
+      lang: meta.id,
+      code: ""
+    };
+    selectedLines.clear();
+    foldedLines.clear();
+    saveCurrentFile();
+    syncEditorView();
+    showToast(`تم فتح الملف: ${currentFile.name}`);
   }
 
-  function validateBuildInputs(cfg) {
-    const errors = [];
-    if (!cfg.appName || cfg.appName.trim().length < 2) {
-      errors.push("أدخل اسمًا صحيحًا للتطبيق (حرفان على الأقل).");
-    }
-    if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(String(cfg.packageId || "").trim())) {
-      errors.push("صيغة Package ID يجب أن تكون مثل: com.dotking.app");
-    }
-    return errors;
+  function getEditorTextarea() {
+    return document.getElementById("sourceCode");
   }
 
-  function triggerFileDownload(filename, content, mime = "text/plain;charset=utf-8") {
-    const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  }
+  function highlightCodeByLang(code, lang) {
+    const escaped = escapeHtml(code || "");
+    if (!escaped) return "";
 
-  function buildManifestJson(cfg) {
-    return JSON.stringify(
-      {
-        name: cfg.appName.trim(),
-        short_name: cfg.appName.trim().slice(0, 12),
-        version: (cfg.version || "1.0.0").trim(),
-        start_url: "./index.html",
-        display: "standalone",
-        background_color: "#0b1120",
-        theme_color: cfg.themeColor || "#3b82f6",
-        icons: []
-      },
-      null,
-      2
-    );
-  }
-
-  function buildServiceWorkerJs(cfg) {
-    const cacheName = `${cfg.packageId.replace(/[^a-z0-9_]/gi, "_")}_${(cfg.version || "1.0.0").replace(/[^a-z0-9_]/gi, "_")}`;
-    return `const CACHE_NAME = "${cacheName}";
-const ASSETS = ["./", "./index.html", "./style.css", "./script.js", "./manifest.json"];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-  );
-});
-
-self.addEventListener("fetch", (event) => {
-  event.respondWith(
-    caches.match(event.request).then((res) => res || fetch(event.request))
-  );
-});`;
-  }
-
-  function buildKotlinWebView(cfg, htmlContent = "") {
-    const pkg = cfg.packageId.trim();
-    const safeTitle = cfg.appName.trim().replace(/"/g, '\\"');
-    const hasInlineHtml = Boolean(htmlContent && htmlContent.trim());
-
-    return `package ${pkg}
-
-import android.annotation.SuppressLint
-import android.os.Bundle
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import androidx.appcompat.app.AppCompatActivity
-
-class MainActivity : AppCompatActivity() {
-
-    private lateinit var webView: WebView
-
-    @SuppressLint("SetJavaScriptEnabled")
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        title = "${safeTitle}"
-
-        webView = WebView(this)
-        setContentView(webView)
-
-        val settings: WebSettings = webView.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.allowFileAccess = true
-        settings.mediaPlaybackRequiresUserGesture = false
-
-        webView.webViewClient = WebViewClient()
-
-        ${
-          hasInlineHtml
-            ? `webView.loadUrl("file:///android_asset/index.html")`
-            : `webView.loadUrl("https://example.com")`
-        }
+    if (lang === "json") {
+      return escaped
+        .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?)/g, (m) =>
+          m.endsWith(":") ? `<span class="syn-fn">${m}</span>` : `<span class="syn-str">${m}</span>`
+        )
+        .replace(/\b(true|false|null)\b/g, `<span class="syn-kw">$1</span>`)
+        .replace(/\b(-?\d+(\.\d+)?)\b/g, `<span class="syn-num">$1</span>`);
     }
 
-    override fun onBackPressed() {
-        if (this::webView.isInitialized && webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
-        }
+    const kwList =
+      lang === "python"
+        ? "def|class|import|from|return|if|elif|else|for|while|in|as|try|except|with|async|await|True|False|None"
+        : lang === "sql"
+        ? "SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|JOIN|ON|ORDER|BY|GROUP|AND|OR"
+        : "const|let|var|function|return|if|else|for|while|switch|case|break|import|from|export|default|async|await|class|interface|type|fun|val|var|override|echo|php";
+
+    const kwRegex = new RegExp(`\\b(${kwList})\\b`, lang === "sql" ? "gi" : "g");
+
+    return escaped
+      .replace(/(\/\/.*$|#.*$|\/\*[\s\S]*?\*\/)/gm, `<span class="syn-cm">$1</span>`)
+      .replace(/(&quot;(?:\\.|[^&quot;])*&quot;|'(?:\\.|[^'])*')/g, `<span class="syn-str">$1</span>`)
+      .replace(kwRegex, `<span class="syn-kw">$1</span>`)
+      .replace(/\b(\d+(\.\d+)?)\b/g, `<span class="syn-num">$1</span>`)
+      .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, `<span class="syn-fn">$1</span>`);
+  }
+
+  function getLineIndexAtCursor(textarea) {
+    if (!textarea) return 0;
+    const pos = textarea.selectionStart || 0;
+    return textarea.value.slice(0, pos).split("\n").length - 1;
+  }
+
+  function syncSelectionFromTextareaRange() {
+    const ta = getEditorTextarea();
+    if (!ta) return;
+    const start = ta.selectionStart || 0;
+    const end = ta.selectionEnd || 0;
+    if (start === end) return;
+
+    const firstLine = ta.value.slice(0, start).split("\n").length - 1;
+    const lastLine = ta.value.slice(0, end).split("\n").length - 1;
+    selectedLines.clear();
+    for (let i = Math.min(firstLine, lastLine); i <= Math.max(firstLine, lastLine); i++) {
+      selectedLines.add(i);
     }
-}`;
+    renderStandaloneEditorHighlightAndLines();
   }
 
-  function buildBuildozerSpec(cfg) {
-    const safeTitle = cfg.appName.trim().replace(/[^a-zA-Z0-9 _-]/g, "") || "ForDevApp";
-    const pkgDomain = cfg.packageId.trim().split(".")[0] || "org";
-    const pkgName = cfg.packageId.trim().replace(/[^a-z0-9]/gi, "").toLowerCase() || "fordevapp";
-    const ver = (cfg.version || "1.0.0").trim();
-
-    return `[app]
-title = ${safeTitle}
-package.name = ${pkgName}
-package.domain = ${pkgDomain}
-source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,json,html,css,js
-version = ${ver}
-requirements = python3,kivy
-orientation = portrait
-fullscreen = 0
-android.permissions = INTERNET
-
-[buildozer]
-log_level = 2
-warn_on_root = 1`;
-  }
-
-  function buildBuildScriptSh() {
-    return `#!/usr/bin/env bash
-set -e
-echo "Checking build environment..."
-if command -v buildozer >/dev/null 2>&1; then
-  buildozer android debug
-else
-  echo "Buildozer not found. Install it or run via GitHub Actions workflow (.github/workflows/build-apk.yml)."
-fi`;
-  }
-
-  function buildGitHubWorkflowYml(cfg) {
-    const safeName = cfg.appName.trim().replace(/"/g, '\\"');
-    return `name: Build ForDev APK
-
-on:
-  workflow_dispatch:
-  push:
-    branches: [ "main" ]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install Buildozer dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
-          pip install --upgrade pip wheel setuptools buildozer cython==0.29.36
-
-      - name: Build Android APK for ${safeName}
-        run: |
-          buildozer android debug
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${cfg.packageId.replace(/[^a-z0-9_.-]/gi, "_")}-apk
-          path: bin/*.apk`;
-  }
-
-  function exportPwaBundleNow() {
-    const errors = validateBuildInputs(buildConfig);
-    if (errors.length) {
-      showToast(errors[0]);
-      renderNotes(errors);
-      return;
-    }
-
-    const html = (web3Files[0]?.code || sourceCodeEl.value || "").trim();
-    const css = (web3Files[1]?.code || "").trim();
-    const js = (web3Files[2]?.code || "").trim();
-
-    const manifest = buildManifestJson(buildConfig);
-    const sw = buildServiceWorkerJs(buildConfig);
-    const indexHtml = `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="${buildConfig.themeColor}" />
-  <link rel="manifest" href="./manifest.json" />
-  <link rel="stylesheet" href="./style.css" />
-  <title>${buildConfig.appName.trim()}</title>
-</head>
-<body>
-${html || "<main><h1>ForDev App</h1></main>"}
-  <script src="./script.js"></script>
-  <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("./sw.js");
-    }
-  </script>
-</body>
-</html>`;
-
-    renderOutput(indexHtml);
-    renderNotes([
-      `تم تجهيز حزمة PWA حقيقية لتطبيق: ${buildConfig.appName.trim()} (${buildConfig.packageId.trim()})`,
-      "تم تنزيل ملفات: manifest.json و sw.js و index.html (بالإضافة إلى style.css و script.js إذا كان بهما كود)."
-    ]);
-
-    triggerFileDownload("manifest.json", manifest, "application/json;charset=utf-8");
-    setTimeout(() => triggerFileDownload("sw.js", sw, "application/javascript;charset=utf-8"), 140);
-    setTimeout(() => triggerFileDownload("index.html", indexHtml, "text/html;charset=utf-8"), 280);
-    if (css) setTimeout(() => triggerFileDownload("style.css", css, "text/css;charset=utf-8"), 420);
-    if (js) setTimeout(() => triggerFileDownload("script.js", js, "application/javascript;charset=utf-8"), 560);
-
-    showToast("تم بناء وتنزيل ملفات حزمة PWA بنجاح");
-  }
-
-  function exportKotlinWebViewNow() {
-    const errors = validateBuildInputs(buildConfig);
-    if (errors.length) {
-      showToast(errors[0]);
-      renderNotes(errors);
-      return;
-    }
-
-    const html = (web3Files[0]?.code || sourceCodeEl.value || "").trim();
-    const ktCode = buildKotlinWebView(buildConfig, html);
-    renderOutput(ktCode);
-    renderNotes([
-      `تم توليد MainActivity.kt للحزمة ${buildConfig.packageId.trim()}`,
-      "ضع MainActivity.kt في مجلد مشروع Android Studio/Kotlin، وإذا أدرجت HTML فضع index.html داخل مجلد assets."
-    ]);
-    triggerFileDownload("MainActivity.kt", ktCode, "text/plain;charset=utf-8");
-    showToast("تم تنزيل MainActivity.kt بنجاح");
-  }
-
-  function exportPythonBuildFilesNow() {
-    const errors = validateBuildInputs(buildConfig);
-    if (errors.length) {
-      showToast(errors[0]);
-      renderNotes(errors);
-      return;
-    }
-
-    const spec = buildBuildozerSpec(buildConfig);
-    const sh = buildBuildScriptSh();
-    renderOutput(spec);
-    renderNotes([
-      "تم توليد buildozer.spec و build.sh لتغليف تطبيق بايثون/Kivy.",
-      "يمكنك تشغيل البناء محليًا في بيئة Linux/Termux أو عبر GitHub Action."
-    ]);
-    triggerFileDownload("buildozer.spec", spec, "text/plain;charset=utf-8");
-    setTimeout(() => triggerFileDownload("build.sh", sh, "text/x-sh;charset=utf-8"), 150);
-    showToast("تم تنزيل buildozer.spec و build.sh");
-  }
-
-  function exportGitHubWorkflowNow() {
-    const errors = validateBuildInputs(buildConfig);
-    if (errors.length) {
-      showToast(errors[0]);
-      renderNotes(errors);
-      return;
-    }
-
-    const yml = buildGitHubWorkflowYml(buildConfig);
-    renderOutput(yml);
-    renderNotes([
-      "تم توليد ملف build-apk.yml الخاص بـ GitHub Actions.",
-      "ارفع الملف إلى المسار .github/workflows/build-apk.yml في مستودعك لبناء ملف APK تلقائيًا."
-    ]);
-    triggerFileDownload("build-apk.yml", yml, "text/yaml;charset=utf-8");
-    showToast("تم تنزيل build-apk.yml بنجاح");
-  }
-
-  window.ForDevRealBuilder = {
-    getConfig: () => ({ ...buildConfig }),
-    setConfig: (patch) => {
-      buildConfig = { ...buildConfig, ...(patch || {}) };
-      saveBuildConfig();
-    },
-    validate: validateBuildInputs,
-    exportPwaBundle: exportPwaBundleNow,
-    exportKotlinWebView: exportKotlinWebViewNow,
-    exportPythonBuild: exportPythonBuildFilesNow,
-    exportGitHubWorkflow: exportGitHubWorkflowNow
-  };
-
-  function ensureRealBuildPanel(workspaceSec) {
-    if (!workspaceSec || workspaceSec.querySelector("#fordevRealBuildPanel")) return;
-
-    const panel = document.createElement("div");
-    panel.id = "fordevRealBuildPanel";
-    panel.className = "fordev-real-build-panel";
-    panel.innerHTML = `
-      <div class="real-build-header">
-        <h3 id="rbTitle">${I18N[state.uiLang].buildTitle}</h3>
-      </div>
-      <div class="real-build-form">
-        <div class="rb-field">
-          <label id="rbAppNameLbl" for="rbAppName">${I18N[state.uiLang].buildAppNameLabel}</label>
-          <input id="rbAppName" type="text" value="${buildConfig.appName}" />
-        </div>
-        <div class="rb-field">
-          <label id="rbPkgLbl" for="rbPkgId">${I18N[state.uiLang].buildPkgLabel}</label>
-          <input id="rbPkgId" type="text" dir="ltr" value="${buildConfig.packageId}" />
-        </div>
-        <div class="rb-field">
-          <label id="rbVerLbl" for="rbVersion">${I18N[state.uiLang].buildVersionLabel}</label>
-          <input id="rbVersion" type="text" dir="ltr" value="${buildConfig.version}" />
-        </div>
-        <div class="rb-field">
-          <label id="rbColorLbl" for="rbThemeColor">${I18N[state.uiLang].buildColorLabel}</label>
-          <input id="rbThemeColor" type="color" value="${buildConfig.themeColor}" />
-        </div>
-      </div>
-      <div class="real-build-actions">
-        <button type="button" id="rbBuildPwaBtn" class="btn btn-primary">${I18N[state.uiLang].buildPwaBtn}</button>
-        <button type="button" id="rbBuildKotlinBtn" class="btn btn-secondary">${I18N[state.uiLang].buildKotlinBtn}</button>
-        <button type="button" id="rbBuildSpecBtn" class="btn btn-secondary">${I18N[state.uiLang].buildSpecBtn}</button>
-        <button type="button" id="rbBuildGhBtn" class="btn btn-secondary">${I18N[state.uiLang].buildWorkflowBtn}</button>
-      </div>
-    `;
-
-    const notesSec = workspaceSec.querySelector(".notes-section");
-    if (notesSec) {
-      workspaceSec.insertBefore(panel, notesSec);
+  function toggleSelectLine(lineIdx) {
+    if (lineIdx < 0) return;
+    if (selectedLines.has(lineIdx)) {
+      selectedLines.delete(lineIdx);
     } else {
-      workspaceSec.appendChild(panel);
+      selectedLines.add(lineIdx);
+    }
+    renderStandaloneEditorHighlightAndLines();
+  }
+
+  function selectCurrentCursorLine() {
+    const ta = getEditorTextarea();
+    if (!ta) return;
+    const lineIdx = getLineIndexAtCursor(ta);
+    if (selectedLines.has(lineIdx) && selectedLines.size === 1) {
+      selectedLines.clear();
+    } else {
+      selectedLines.add(lineIdx);
+    }
+    renderStandaloneEditorHighlightAndLines();
+    showToast(`تم تحديد السطر ${lineIdx + 1}`);
+  }
+
+  function selectLineRangePrompt() {
+    const ta = getEditorTextarea();
+    if (!ta) return;
+    const total = ta.value.split("\n").length;
+    const current = getLineIndexAtCursor(ta) + 1;
+    const input = window.prompt(`أدخل نطاق الأسطر (مثال: ${current}-${Math.min(total, current + 2)}) من أصل ${total}:`, `${current}-${Math.min(total, current + 2)}`);
+    if (!input) return;
+
+    const match = input.trim().match(/^(\d+)\s*[-–:]\s*(\d+)$/);
+    if (!match) {
+      showToast("صيغة النطاق غير صحيحة");
+      return;
     }
 
-    const nameEl = panel.querySelector("#rbAppName");
-    const pkgEl = panel.querySelector("#rbPkgId");
-    const verEl = panel.querySelector("#rbVersion");
-    const colEl = panel.querySelector("#rbThemeColor");
-
-    const syncInputsToConfig = () => {
-      buildConfig.appName = nameEl.value;
-      buildConfig.packageId = pkgEl.value;
-      buildConfig.version = verEl.value;
-      buildConfig.themeColor = colEl.value;
-      saveBuildConfig();
-    };
-
-    nameEl?.addEventListener("input", syncInputsToConfig);
-    pkgEl?.addEventListener("input", syncInputsToConfig);
-    verEl?.addEventListener("input", syncInputsToConfig);
-    colEl?.addEventListener("input", syncInputsToConfig);
-
-    panel.querySelector("#rbBuildPwaBtn")?.addEventListener("click", () => {
-      syncInputsToConfig();
-      exportPwaBundleNow();
-    });
-
-    panel.querySelector("#rbBuildKotlinBtn")?.addEventListener("click", () => {
-      syncInputsToConfig();
-      exportKotlinWebViewNow();
-    });
-
-    panel.querySelector("#rbBuildSpecBtn")?.addEventListener("click", () => {
-      syncInputsToConfig();
-      exportPythonBuildFilesNow();
-    });
-
-    panel.querySelector("#rbBuildGhBtn")?.addEventListener("click", () => {
-      syncInputsToConfig();
-      exportGitHubWorkflowNow();
-    });
+    const from = Math.max(1, Math.min(total, Number(match[1])));
+    const to = Math.max(1, Math.min(total, Number(match[2])));
+    selectedLines.clear();
+    for (let i = Math.min(from, to) - 1; i <= Math.max(from, to) - 1; i++) {
+      selectedLines.add(i);
+    }
+    renderStandaloneEditorHighlightAndLines();
+    showToast(`تم تحديد الأسطر من ${Math.min(from, to)} إلى ${Math.max(from, to)}`);
   }
 
-  function applyRealBuildLanguage(lang) {
-    const dict = I18N[lang] || I18N.ar;
-    const setText = (id, val) => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = val;
-    };
-    setText("rbTitle", dict.buildTitle);
-    setText("rbAppNameLbl", dict.buildAppNameLabel);
-    setText("rbPkgLbl", dict.buildPkgLabel);
-    setText("rbVerLbl", dict.buildVersionLabel);
-    setText("rbColorLbl", dict.buildColorLabel);
-    setText("rbBuildPwaBtn", dict.buildPwaBtn);
-    setText("rbBuildKotlinBtn", dict.buildKotlinBtn);
-    setText("rbBuildSpecBtn", dict.buildSpecBtn);
-    setText("rbBuildGhBtn", dict.buildWorkflowBtn);
+  async function copySelectedLines() {
+    const ta = getEditorTextarea();
+    if (!ta) return;
+    const lines = ta.value.split("\n");
+    let textToCopy = "";
+
+    if (selectedLines.size > 0) {
+      const sorted = Array.from(selectedLines).sort((a, b) => a - b);
+      textToCopy = sorted.map((idx) => lines[idx] ?? "").join("\n");
+    } else if (ta.selectionStart !== ta.selectionEnd) {
+      textToCopy = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+    } else {
+      const cur = getLineIndexAtCursor(ta);
+      textToCopy = lines[cur] ?? "";
+    }
+
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      showToast("تم نسخ الأسطر المحددة");
+    } catch {
+      showToast("تعذر النسخ");
+    }
   }
 
-  function syncHybridToolView() {
-    const toolsPage = document.querySelector('.fordev-page-section[data-page-key="tools"]');
-    if (!toolsPage) return;
-    toolsPage.classList.toggle("tool-detail-open", isToolPageOpen);
-    toolsPage.scrollTop = 0;
+  function deleteSelectedLines() {
+    const ta = getEditorTextarea();
+    if (!ta) return;
+    const lines = ta.value.split("\n");
+
+    if (selectedLines.size > 0) {
+      const remaining = lines.filter((_, idx) => !selectedLines.has(idx));
+      ta.value = remaining.join("\n");
+      currentFile.code = ta.value;
+      selectedLines.clear();
+      saveCurrentFile();
+      renderStandaloneEditorHighlightAndLines();
+      showToast("تم حذف الأسطر المحددة");
+      return;
+    }
+
+    const cur = getLineIndexAtCursor(ta);
+    lines.splice(cur, 1);
+    ta.value = lines.join("\n");
+    currentFile.code = ta.value;
+    saveCurrentFile();
+    renderStandaloneEditorHighlightAndLines();
+    showToast(`تم حذف السطر ${cur + 1}`);
   }
 
-  function openToolSeparatePage(toolId, autoRun = true) {
-    selectTool(toolId, autoRun);
-    isToolPageOpen = true;
-    syncHybridToolView();
+  function clearSelectedLines() {
+    selectedLines.clear();
+    renderStandaloneEditorHighlightAndLines();
+    showToast("تم إلغاء تحديد الأسطر");
+  }
+
+  function syncEditorView() {
+    const ta = getEditorTextarea();
+    const titleEl = document.getElementById("spckActiveFileTitle");
+    const langSel = document.getElementById("standaloneEditorLangSelect");
+
+    if (titleEl) titleEl.textContent = currentFile.name;
+    if (langSel) langSel.value = currentFile.lang;
+    if (ta && ta.value !== currentFile.code) {
+      ta.value = currentFile.code;
+    }
+
+    renderStandaloneEditorHighlightAndLines();
+  }
+
+  function toggleFoldBlocks() {
+    const ta = getEditorTextarea();
+    const lines = (ta?.value || "").split("\n");
+    const foldable = [];
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].trim();
+      if (t.endsWith("{") || t.endsWith(":") || /^<[a-zA-Z0-9-]+[^>]*>$/.test(t)) {
+        foldable.push(i);
+      }
+    }
+    if (!foldable.length) {
+      showToast("لا توجد كتل قابلة للطي");
+      return;
+    }
+    if (foldedLines.size > 0) {
+      foldedLines.clear();
+      showToast("تم توسيع الكتل");
+    } else {
+      foldable.forEach((idx) => {
+        if (idx + 1 < lines.length) foldedLines.add(idx);
+      });
+      showToast(`تم طي ${foldedLines.size} كتلة`);
+    }
+    renderStandaloneEditorHighlightAndLines();
+  }
+
+  function renderStandaloneEditorHighlightAndLines() {
+    const ta = getEditorTextarea();
+    const hiEl = document.getElementById("standaloneEditorHighlight");
+    const linesEl = document.getElementById("standaloneEditorLines");
+    const statsEl = document.getElementById("standaloneEditorStats");
+    const raw = ta?.value || "";
+    const lines = raw.split("\n");
+
+    const lineRowHtml = [];
+    const codeRowHtml = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const isSel = selectedLines.has(i);
+      const selClass = isSel ? " is-selected-line" : "";
+
+      if (foldedLines.has(i)) {
+        lineRowHtml.push(`<div class="spck-line-num${selClass}" data-line-idx="${i}">${i + 1}</div>`);
+        const foldedContent = `${highlightCodeByLang(lines[i], currentFile.lang)} <span class="syn-cm">/* ... */</span>`;
+        codeRowHtml.push(`<div class="spck-code-line${selClass}">${foldedContent || " "}</div>`);
+        i++;
+        while (i < lines.length && (lines[i].startsWith("  ") || lines[i].startsWith("\t"))) {
+          i++;
+        }
+      } else {
+        lineRowHtml.push(`<div class="spck-line-num${selClass}" data-line-idx="${i}">${i + 1}</div>`);
+        const highlighted = highlightCodeByLang(lines[i], currentFile.lang);
+        codeRowHtml.push(`<div class="spck-code-line${selClass}">${highlighted || " "}</div>`);
+        i++;
+      }
+    }
+
+    if (linesEl) linesEl.innerHTML = lineRowHtml.join("") || `<div class="spck-line-num">1</div>`;
+    if (hiEl) hiEl.innerHTML = codeRowHtml.join("") || `<div class="spck-code-line"> </div>`;
+    if (statsEl) {
+      const selCount = selectedLines.size;
+      const selText = selCount > 0 ? ` | محدد: ${selCount} سطر` : "";
+      statsEl.textContent =
+        state.uiLang === "ar"
+          ? `${currentFile.name} | ${lines.length} أسطر | ${raw.length} حرف${selText}`
+          : `${currentFile.name} | ${lines.length} lines | ${raw.length} chars${selText}`;
+    }
+  }
+
+  function updateAutocompletePopup() {
+    const popup = document.getElementById("editorAutocompleteBox");
+    const ta = getEditorTextarea();
+    if (!popup || !ta) return;
+
+    const pos = ta.selectionStart || 0;
+    const before = ta.value.slice(0, pos);
+    const match = before.match(/([a-zA-Z0-9_$-]+)$/);
+    const prefix = match ? match[1].toLowerCase() : "";
+
+    if (!prefix) {
+      popup.classList.add("hidden");
+      currentSuggestions = [];
+      return;
+    }
+
+    const pool = LANG_SUGGESTIONS[currentFile.lang] || LANG_SUGGESTIONS.javascript;
+    const matches = pool.filter((w) => w.toLowerCase().startsWith(prefix) && w.toLowerCase() !== prefix);
+
+    if (!matches.length) {
+      popup.classList.add("hidden");
+      currentSuggestions = [];
+      return;
+    }
+
+    currentSuggestions = matches.slice(0, 6);
+    selectedSuggestionIdx = 0;
+    popup.innerHTML = currentSuggestions
+      .map(
+        (w, idx) =>
+          `<button type="button" class="ac-item ${idx === 0 ? "active" : ""}" data-ac-idx="${idx}">${escapeHtml(w)}</button>`
+      )
+      .join("");
+    popup.classList.remove("hidden");
+  }
+
+  function applySuggestion(word) {
+    const ta = getEditorTextarea();
+    if (!word || !ta) return;
+
+    const pos = ta.selectionStart || 0;
+    const before = ta.value.slice(0, pos);
+    const after = ta.value.slice(pos);
+    const replaced = before.replace(/([a-zA-Z0-9_$-]+)$/, word);
+    ta.value = `${replaced}${after}`;
+    ta.selectionStart = ta.selectionEnd = replaced.length;
+    currentFile.code = ta.value;
+    saveCurrentFile();
+
+    document.getElementById("editorAutocompleteBox")?.classList.add("hidden");
+    currentSuggestions = [];
+    renderStandaloneEditorHighlightAndLines();
+  }
+
+  function insertSnippetAtCursor(snippet) {
+    const ta = getEditorTextarea();
+    if (!ta || !snippet) return;
+
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? ta.value.length;
+    ta.value = ta.value.slice(0, start) + snippet + ta.value.slice(end);
+    ta.selectionStart = ta.selectionEnd = start + snippet.length;
+    currentFile.code = ta.value;
+    saveCurrentFile();
+    renderStandaloneEditorHighlightAndLines();
+    ta.focus();
+  }
+
+  function moveCursorByChars(delta) {
+    const ta = getEditorTextarea();
+    if (!ta) return;
+    const nextPos = Math.max(0, Math.min(ta.value.length, (ta.selectionStart || 0) + delta));
+    ta.selectionStart = ta.selectionEnd = nextPos;
+    ta.focus();
+  }
+
+  function insertAssetIntoEditorDirect(snippet, label, targetLang = null) {
+    const ta = getEditorTextarea();
+    if (!snippet || !ta) return;
+
+    if (targetLang) {
+      currentFile.lang = targetLang;
+      const sel = document.getElementById("standaloneEditorLangSelect");
+      if (sel) sel.value = targetLang;
+    }
+
+    const sep = ta.value.trim() ? "\n\n" : "";
+    ta.value = `${ta.value}${sep}${snippet}`;
+    currentFile.code = ta.value;
+    saveCurrentFile();
+    renderStandaloneEditorHighlightAndLines();
+
+    if (typeof window.goToForDevSection === "function") {
+      window.goToForDevSection("editor");
+    }
+    showToast(`تمت إضافة ${label} إلى ${currentFile.name}`);
+  }
+
+  function quickAddFirstAsset(type) {
+    if (type === "icon" && Array.isArray(window.ICONS_LIBRARY) && window.ICONS_LIBRARY[0]) {
+      insertAssetIntoEditorDirect(window.ICONS_LIBRARY[0].svg, `أيقونة (${window.ICONS_LIBRARY[0].title})`, "html");
+    } else if (type === "font" && Array.isArray(window.FONTS_LIBRARY) && window.FONTS_LIBRARY[0]) {
+      insertAssetIntoEditorDirect(window.FONTS_LIBRARY[0].css, `خط (${window.FONTS_LIBRARY[0].title})`, "css");
+    } else if (type === "bg" && Array.isArray(window.BACKGROUNDS_LIBRARY) && window.BACKGROUNDS_LIBRARY[0]) {
+      insertAssetIntoEditorDirect(window.BACKGROUNDS_LIBRARY[0].css, `خلفية (${window.BACKGROUNDS_LIBRARY[0].title})`, "css");
+    } else {
+      const secMap = { icon: "icons", font: "fonts", bg: "backgrounds" };
+      if (typeof window.goToForDevSection === "function") {
+        window.goToForDevSection(secMap[type] || "icons");
+      }
+    }
+  }
+
+  function openStandaloneLivePreview() {
+    const ta = getEditorTextarea();
+    const frame = document.getElementById("standaloneLiveFrame");
+    const box = document.getElementById("standaloneLivePreviewBox");
+    if (!ta || !frame || !box) return;
+
+    const code = ta.value || "";
+    const htmlDoc =
+      currentFile.lang === "css"
+        ? `<!DOCTYPE html><html><head><style>${code}</style></head><body><div class="box">معاينة تنسيق CSS — ForDev Editor</div></body></html>`
+        : /<html[\s>]/i.test(code)
+        ? code
+        : `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:system-ui,sans-serif;padding:16px;}</style></head><body>${code}<script>${currentFile.lang === "javascript" ? code : ""}</script></body></html>`;
+
+    frame.srcdoc = htmlDoc;
+    box.classList.remove("hidden");
+  }
+
+  function exitCurrentToolOrEditor() {
+    isToolPageOpen = false;
+    document.querySelector('.fordev-page-section[data-page-key="tools"]')?.classList.remove("tool-detail-open");
+    document.getElementById("standaloneLivePreviewBox")?.classList.add("hidden");
     if (typeof window.goToForDevSection === "function") {
       window.goToForDevSection("tools");
     }
+    showToast("تم الخروج من الأداة");
   }
 
-  function closeToolSeparatePage() {
-    isToolPageOpen = false;
-    syncHybridToolView();
+  function loadGeminiKey() {
+    try {
+      geminiApiKey = localStorage.getItem(GEMINI_KEY_STORAGE) || "";
+    } catch {
+      geminiApiKey = "";
+    }
   }
 
-  window.openForDevToolPage = openToolSeparatePage;
-  window.closeForDevToolPage = closeToolSeparatePage;
+  function saveGeminiKey(key) {
+    geminiApiKey = (key || "").trim();
+    try {
+      if (geminiApiKey) localStorage.setItem(GEMINI_KEY_STORAGE, geminiApiKey);
+      else localStorage.removeItem(GEMINI_KEY_STORAGE);
+    } catch {
+      // تجاهل
+    }
+  }
+
+  async function fixCodeWithGemini() {
+    const key = (document.getElementById("rbGeminiKey")?.value || geminiApiKey || "").trim();
+    if (!key) {
+      showToast(I18N[state.uiLang].geminiMissingKey);
+      return;
+    }
+    saveGeminiKey(key);
+
+    const ta = getEditorTextarea();
+    const code = ta?.value || "";
+    if (!code.trim()) {
+      showToast("المحرر فارغ");
+      return;
+    }
+
+    const fixBtn = document.getElementById("rbGeminiFixBtn");
+    const orig = fixBtn ? fixBtn.textContent : "";
+    if (fixBtn) {
+      fixBtn.disabled = true;
+      fixBtn.textContent = I18N[state.uiLang].geminiFixing;
+    }
+
+    const prompt = `You are a strict code reviewer and fixer.
+File: ${currentFile.name} | Language: ${currentFile.lang}
+Analyze the following code, fix any syntax, runtime, or structural errors, and return ONLY a valid JSON object with two keys:
+1. "fixedCode": string (complete corrected code without markdown fences)
+2. "fixes": array of short strings in Arabic explaining what was checked/fixed
+
+Code:
+${code}`;
+
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.2 }
+        })
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 160)}`);
+      }
+
+      const data = await res.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const parsed = JSON.parse(rawText);
+
+      if (typeof parsed.fixedCode === "string" && parsed.fixedCode.trim() && ta) {
+        ta.value = parsed.fixedCode;
+        currentFile.code = parsed.fixedCode;
+        saveCurrentFile();
+        foldedLines.clear();
+        selectedLines.clear();
+        renderStandaloneEditorHighlightAndLines();
+      }
+
+      const fixes = Array.isArray(parsed.fixes) && parsed.fixes.length ? parsed.fixes : ["تم فحص الكود وتحديثه."];
+      renderNotes(fixes);
+      showToast(I18N[state.uiLang].geminiFixedToast);
+    } catch (err) {
+      renderNotes([`خطأ Gemini: ${err.message}`]);
+      showToast("تعذر الفحص عبر Gemini");
+    } finally {
+      if (fixBtn) {
+        fixBtn.disabled = false;
+        fixBtn.textContent = orig || I18N[state.uiLang].geminiFixBtn;
+      }
+    }
+  }
 
   function loadSavedState() {
     try {
@@ -652,740 +700,331 @@ ${html || "<main><h1>ForDev App</h1></main>"}
         };
       }
     } catch {
-      // تجاهل أخطاء التخزين
+      // تجاهل
     }
   }
 
   function saveState() {
+    const ta = getEditorTextarea();
+    if (!ta) return;
     state.toolData[state.toolId] = {
-      sourceLang: sourceLangEl.value,
-      targetLang: targetLangEl.value,
-      sourceCode: sourceCodeEl.value,
-      targetCode: targetCodeEl.value
+      sourceLang: sourceLangEl?.value || "javascript",
+      targetLang: targetLangEl?.value || "python",
+      sourceCode: ta.value,
+      targetCode: targetCodeEl ? targetCodeEl.value : ""
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
-      // تجاهل أخطاء السعة
+      // تجاهل
     }
-  }
-
-  function saveWeb3Files() {
-    try {
-      localStorage.setItem(WEB3_STORAGE_KEY, JSON.stringify(web3Files));
-    } catch {
-      // تجاهل أخطاء السعة
-    }
-  }
-
-  function loadWeb3Files() {
-    try {
-      const raw = localStorage.getItem(WEB3_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length === 3) {
-        web3Files = parsed.map((item, idx) => ({
-          name: typeof item?.name === "string" ? item.name : defaultWeb3Files()[idx].name,
-          code: typeof item?.code === "string" ? item.code : ""
-        }));
-      }
-    } catch {
-      // تجاهل أخطاء التخزين
-    }
-  }
-
-  function updateLineNumbers(text, linesEl) {
-    const count = text ? text.split("\n").length : 1;
-    linesEl.textContent = Array.from({ length: count }, (_, i) => i + 1).join("\n");
-  }
-
-  function updateStats(text, statsEl) {
-    const lines = text ? text.split("\n").length : 0;
-    const chars = text ? text.length : 0;
-    statsEl.textContent =
-      state.uiLang === "ar" ? `${lines} أسطر | ${chars} حرف` : `${lines} lines | ${chars} chars`;
-  }
-
-  function renderOutput(code) {
-    const safeCode = code || "";
-    targetCodeEl.value = safeCode;
-    highlightedOutputEl.innerHTML = CodeConverter.highlightSyntax(safeCode);
-    updateLineNumbers(safeCode, targetLinesEl);
-    updateStats(safeCode, targetStatsEl);
   }
 
   function renderNotes(notes) {
-    if (!notes || !notes.length) {
-      notesContentEl.innerHTML = "";
-      return;
+    if (!notesContentEl) return;
+    notesContentEl.innerHTML = notes && notes.length ? `<ul>${notes.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}</ul>` : "";
+  }
+
+  function renderOutput(code) {
+    const safe = code || "";
+    if (targetCodeEl) targetCodeEl.value = safe;
+    if (highlightedOutputEl && window.CodeConverter?.highlightSyntax) {
+      highlightedOutputEl.innerHTML = CodeConverter.highlightSyntax(safe);
     }
-    notesContentEl.innerHTML = `<ul>${notes.map((n) => `<li>${n}</li>`).join("")}</ul>`;
-  }
-
-  function populateSelect(selectEl, options, selectedValue) {
-    selectEl.innerHTML = options
-      .map((opt) => `<option value="${opt.value}">${opt.label}</option>`)
-      .join("");
-    if (selectedValue && options.some((o) => o.value === selectedValue)) {
-      selectEl.value = selectedValue;
+    if (targetLinesEl) {
+      const cnt = safe ? safe.split("\n").length : 1;
+      targetLinesEl.textContent = Array.from({ length: cnt }, (_, i) => i + 1).join("\n");
     }
-  }
-
-  function canPreviewCurrentTool() {
-    return (
-      state.toolId === "web-to-app" ||
-      state.toolId === "web-pack" ||
-      sourceLangEl.value === "html" ||
-      sourceLangEl.value === "html-site"
-    );
-  }
-
-  function syncPreviewAvailability() {
-    const allowed = canPreviewCurrentTool();
-    previewBtn.classList.toggle("hidden", !allowed);
-    if (!allowed) {
-      previewBox.classList.add("hidden");
+    if (targetStatsEl) {
+      const l = safe ? safe.split("\n").length : 0;
+      const c = safe.length;
+      targetStatsEl.textContent = state.uiLang === "ar" ? `${l} أسطر | ${c} حرف` : `${l} lines | ${c} chars`;
     }
   }
 
   function syncWeb3Visibility(toolId) {
-    if (!web3Panel) return;
+    const panel = document.getElementById("web3FilesMode");
+    if (!panel) return;
     const isWebTool = WEB3_SUPPORTED_TOOLS.has(toolId);
-    web3Panel.classList.toggle("hidden", !isWebTool);
-    web3Panel.style.display = isWebTool ? "block" : "none";
-  }
-
-  function renderWeb3Slot(index) {
-    if (!web3Panel || !web3NameInput || !web3Editor) return;
-    web3ActiveIndex = index;
-    web3Tabs.forEach((tab, i) => tab.classList.toggle("active", i === index));
-    web3NameInput.value = web3Files[index].name;
-    web3Editor.value = web3Files[index].code;
-  }
-
-  function resetWeb3Files() {
-    web3Files = defaultWeb3Files();
-    try {
-      localStorage.removeItem(WEB3_STORAGE_KEY);
-    } catch {
-      // تجاهل أخطاء التخزين
-    }
-    renderWeb3Slot(0);
+    panel.classList.toggle("hidden", !isWebTool);
+    panel.style.display = isWebTool ? "block" : "none";
   }
 
   function selectTool(toolId, autoRun = true) {
     state.toolId = toolId;
     syncWeb3Visibility(toolId);
 
-    const cfg = TOOLS_CONFIG[toolId] || TOOLS_CONFIG.syntax;
+    const cfg = window.TOOLS_CONFIG?.[toolId] || window.TOOLS_CONFIG?.syntax || {
+      titleAr: toolId,
+      titleEn: toolId,
+      hintAr: "",
+      hintEn: "",
+      sources: [{ value: "javascript", label: "JavaScript" }],
+      targets: [{ value: "python", label: "Python" }],
+      defaultSource: "javascript",
+      defaultTarget: "python",
+      sample: ""
+    };
 
-    document.querySelectorAll(".tool-card").forEach((card) => {
-      card.classList.toggle("active", card.dataset.tool === toolId);
-    });
+    if (activeToolBadge) activeToolBadge.textContent = state.uiLang === "ar" ? cfg.titleAr : cfg.titleEn;
+    if (activeToolHint) activeToolHint.textContent = state.uiLang === "ar" ? cfg.hintAr : cfg.hintEn;
 
-    activeToolBadge.textContent = state.uiLang === "ar" ? cfg.titleAr : cfg.titleEn;
-    activeToolHint.textContent = state.uiLang === "ar" ? cfg.hintAr : cfg.hintEn;
-
-    const savedTool = state.toolData[toolId];
-    populateSelect(sourceLangEl, cfg.sources, savedTool?.sourceLang || cfg.defaultSource);
-    populateSelect(targetLangEl, cfg.targets, savedTool?.targetLang || cfg.defaultTarget);
-
-    sourceCodeEl.value = savedTool?.sourceCode !== undefined ? savedTool.sourceCode : cfg.sample;
-    updateLineNumbers(sourceCodeEl.value, sourceLinesEl);
-    updateStats(sourceCodeEl.value, sourceStatsEl);
-
-    syncPreviewAvailability();
-
-    if (autoRun) {
-      runTool();
-    } else if (savedTool?.targetCode !== undefined) {
-      renderOutput(savedTool.targetCode);
+    if (sourceLangEl) {
+      sourceLangEl.innerHTML = cfg.sources.map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
+      sourceLangEl.value = state.toolData[toolId]?.sourceLang || cfg.defaultSource;
+    }
+    if (targetLangEl) {
+      targetLangEl.innerHTML = cfg.targets.map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
+      targetLangEl.value = state.toolData[toolId]?.targetLang || cfg.defaultTarget;
     }
 
-    saveState();
-  }
-
-  function runTool() {
-    const result = CodeConverter.process({
-      toolId: state.toolId,
-      sourceLang: sourceLangEl.value,
-      targetLang: targetLangEl.value,
-      code: sourceCodeEl.value
-    });
-
-    renderOutput(result.code);
-    renderNotes(result.notes);
-    saveState();
-
-    if (!previewBox.classList.contains("hidden")) {
-      updatePreviewFrame();
+    const ta = getEditorTextarea();
+    if (ta) {
+      const initialCode = state.toolData[toolId]?.sourceCode ?? cfg.sample ?? currentFile.code;
+      ta.value = initialCode;
+      currentFile.code = initialCode;
+      saveCurrentFile();
+      renderStandaloneEditorHighlightAndLines();
     }
-  }
 
-  function updatePreviewFrame() {
-    const code = sourceCodeEl.value || "";
-    const wrappedHtml = /<html[\s>]/i.test(code)
-      ? code
-      : `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:system-ui,sans-serif;padding:16px;background:#f8fafc;color:#0f172a;}.card{background:#ffffff;padding:16px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);}button{background:#2563eb;color:#ffffff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;}</style></head><body>${code}</body></html>`;
-    previewFrame.srcdoc = wrappedHtml;
+    if (autoRun && window.CodeConverter?.process) {
+      const res = CodeConverter.process({
+        toolId: state.toolId,
+        sourceLang: sourceLangEl?.value || "javascript",
+        targetLang: targetLangEl?.value || "python",
+        code: ta?.value || ""
+      });
+      renderOutput(res.code);
+      renderNotes(res.notes);
+    }
+    saveState();
   }
 
   function applyTheme(theme) {
     state.theme = theme;
     document.documentElement.setAttribute("data-theme", theme);
-    if (theme === "light") {
-      sunIcon.classList.remove("hidden");
-      moonIcon.classList.add("hidden");
-    } else {
-      sunIcon.classList.add("hidden");
-      moonIcon.classList.remove("hidden");
+    if (sunIcon && moonIcon) {
+      sunIcon.classList.toggle("hidden", theme !== "light");
+      moonIcon.classList.toggle("hidden", theme === "light");
     }
     saveState();
-  }
-
-  function applyDesignAssetsLanguage(lang) {
-    const dict = I18N[lang] || I18N.ar;
-    const fontSampleInput = document.getElementById("fontLiveSampleInput");
-    const backBtn = document.getElementById("backToToolsBtn");
-
-    if (fontSampleInput) {
-      fontSampleInput.placeholder = dict.fontSamplePlaceholder;
-    }
-
-    if (backBtn) {
-      backBtn.textContent = dict.backToTools;
-    }
-
-    document.querySelectorAll('[data-icon-mode="standard"]').forEach((btn) => {
-      btn.textContent = dict.standardIconsBtn;
-    });
-    document.querySelectorAll('[data-icon-mode="illustrations"]').forEach((btn) => {
-      btn.textContent = dict.illustrationIconsBtn;
-    });
-
-    document.querySelectorAll('[data-page-key="fonts"] .asset-copy-btn, #assetPanelFonts .asset-copy-btn').forEach((btn) => {
-      btn.textContent = dict.copyCss;
-    });
-    document.querySelectorAll('[data-page-key="fonts"] .asset-insert-btn, #assetPanelFonts .asset-insert-btn').forEach((btn) => {
-      btn.textContent = dict.insertCss;
-    });
-
-    document.querySelectorAll('[data-page-key="icons"] .asset-copy-btn, #assetPanelIcons .asset-copy-btn').forEach((btn) => {
-      btn.textContent = dict.copySvg;
-    });
-    document.querySelectorAll('[data-page-key="icons"] .asset-insert-btn, #assetPanelIcons .asset-insert-btn').forEach((btn) => {
-      btn.textContent = dict.insertHtml;
-    });
-
-    document.querySelectorAll('[data-page-key="backgrounds"] .asset-copy-btn, #assetPanelBackgrounds .asset-copy-btn').forEach((btn) => {
-      btn.textContent = dict.copyCss;
-    });
-    document.querySelectorAll('[data-page-key="backgrounds"] .asset-insert-btn, #assetPanelBackgrounds .asset-insert-btn').forEach((btn) => {
-      btn.textContent = dict.insertCss;
-    });
-
-    const navLabelMap = {
-      tools: dict.navTools,
-      fonts: dict.navFonts,
-      icons: dict.navIcons,
-      backgrounds: dict.navBackgrounds
-    };
-
-    document.querySelectorAll("[data-bnav]").forEach((item) => {
-      const key = item.dataset.bnav;
-      const labelEl = item.querySelector(".bnav-label");
-      if (labelEl && navLabelMap[key]) {
-        labelEl.textContent = navLabelMap[key];
-      }
-    });
-
-    applyRealBuildLanguage(lang);
   }
 
   function applyUiLanguage(lang) {
     state.uiLang = lang;
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
-    langToggle.textContent = lang === "ar" ? "EN" : "عربي";
+    if (langToggle) langToggle.textContent = lang === "ar" ? "EN" : "عربي";
 
+    const dict = I18N[lang] || I18N.ar;
     document.querySelectorAll("[data-i18n]").forEach((el) => {
-      const key = el.getAttribute("data-i18n");
-      if (I18N[lang] && I18N[lang][key]) {
-        el.textContent = I18N[lang][key];
-      }
+      const k = el.getAttribute("data-i18n");
+      if (dict[k]) el.textContent = dict[k];
     });
 
-    const cfg = TOOLS_CONFIG[state.toolId];
-    if (cfg) {
-      activeToolBadge.textContent = lang === "ar" ? cfg.titleAr : cfg.titleEn;
-      activeToolHint.textContent = lang === "ar" ? cfg.hintAr : cfg.hintEn;
-    }
-
-    updateStats(sourceCodeEl.value, sourceStatsEl);
-    updateStats(targetCodeEl.value, targetStatsEl);
-    applyDesignAssetsLanguage(lang);
-    saveState();
-  }
-
-  function getDownloadFilename() {
-    const map = {
-      javascript: "fordev-output.js",
-      python: "fordev-output.py",
-      "python-dict": "fordev-dict.py",
-      kivy: "main.py",
-      tkinter: "app_gui.py",
-      flutter: "fordev_widget.dart",
-      "react-native": "ForDevScreen.jsx",
-      "apk-buildozer": "buildozer.spec",
-      "briefcase-app": "pyproject.toml",
-      "pwa-bundle": "manifest.json",
-      "android-webview": "MainActivity.kt",
-      formatted: "formatted-output.txt"
+    const setTxt = (id, v) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = v;
     };
-    return map[targetLangEl.value] || "fordev-output.txt";
-  }
+    const setPh = (id, v) => {
+      const el = document.getElementById(id);
+      if (el) el.placeholder = v;
+    };
 
-  toolsGrid.addEventListener("click", (e) => {
-    const card = e.target.closest(".tool-card");
-    if (card && card.dataset.tool) {
-      openToolSeparatePage(card.dataset.tool, true);
-    }
-  });
+    setTxt("standaloneFoldBtn", dict.foldBtn);
+    setTxt("standalonePreviewBtn", dict.livePreviewBtn);
+    setTxt("standaloneAddIconBtn", dict.insertIconBtn);
+    setTxt("standaloneAddFontBtn", dict.insertFontBtn);
+    setTxt("standaloneAddBgBtn", dict.insertBgBtn);
+    setTxt("standaloneNewFileBtn", dict.newFileBtn);
+    setTxt("standaloneExitToolBtn", dict.backToTools);
+    setTxt("spckSelectLineBtn", dict.selectLineBtn);
+    setTxt("spckSelectRangeBtn", dict.selectRangeBtn);
+    setTxt("spckClearSelectBtn", dict.clearSelectBtn);
+    setTxt("spckCopyLinesBtn", dict.copyLinesBtn);
+    setTxt("spckDeleteLinesBtn", dict.deleteLinesBtn);
+    setTxt("rbGeminiSaveBtn", dict.geminiSaveKey);
+    setTxt("rbGeminiFixBtn", dict.geminiFixBtn);
+    setPh("rbGeminiKey", dict.geminiKeyPlaceholder);
+    setPh("fontLiveSampleInput", dict.fontSamplePlaceholder);
 
-  convertBtn.addEventListener("click", runTool);
+    document.querySelectorAll('[data-icon-mode="standard"]').forEach((b) => (b.textContent = dict.standardIconsBtn));
+    document.querySelectorAll('[data-icon-mode="illustrations"]').forEach((b) => (b.textContent = dict.illustrationIconsBtn));
 
-  swapBtn.addEventListener("click", () => {
-    const src = sourceLangEl.value;
-    const tgt = targetLangEl.value;
-    const hasSrcInTgt = [...targetLangEl.options].some((o) => o.value === src);
-    const hasTgtInSrc = [...sourceLangEl.options].some((o) => o.value === tgt);
-
-    if (hasSrcInTgt && hasTgtInSrc) {
-      sourceLangEl.value = tgt;
-      targetLangEl.value = src;
-      if (targetCodeEl.value.trim()) {
-        sourceCodeEl.value = targetCodeEl.value;
-        updateLineNumbers(sourceCodeEl.value, sourceLinesEl);
-        updateStats(sourceCodeEl.value, sourceStatsEl);
-      }
-      runTool();
-    }
-  });
-
-  sampleBtn.addEventListener("click", () => {
-    const cfg = TOOLS_CONFIG[state.toolId];
-    if (!cfg) return;
-    sourceCodeEl.value = cfg.sample;
-    updateLineNumbers(sourceCodeEl.value, sourceLinesEl);
-    updateStats(sourceCodeEl.value, sourceStatsEl);
-    runTool();
-  });
-
-  if (resetToolBtn) {
-    resetToolBtn.addEventListener("click", () => {
-      delete state.toolData[state.toolId];
-      if (WEB3_SUPPORTED_TOOLS.has(state.toolId)) {
-        resetWeb3Files();
-      }
-      selectTool(state.toolId, true);
-      showToast(I18N[state.uiLang].resetDone);
+    const navLabels = {
+      tools: dict.navTools,
+      fonts: dict.navFonts,
+      editor: dict.navEditor,
+      icons: dict.navIcons,
+      backgrounds: dict.navBackgrounds
+    };
+    document.querySelectorAll("[data-bnav]").forEach((item) => {
+      const lbl = item.querySelector(".bnav-label");
+      if (lbl && navLabels[item.dataset.bnav]) lbl.textContent = navLabels[item.dataset.bnav];
     });
-  }
 
-  previewBtn.addEventListener("click", () => {
-    if (!canPreviewCurrentTool()) return;
-    previewBox.classList.remove("hidden");
-    updatePreviewFrame();
-  });
-
-  closePreviewBtn.addEventListener("click", () => {
-    previewBox.classList.add("hidden");
-  });
-
-  sourceCodeEl.addEventListener("keydown", (e) => {
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const start = sourceCodeEl.selectionStart;
-      const end = sourceCodeEl.selectionEnd;
-      const indent = "    ";
-      sourceCodeEl.value =
-        sourceCodeEl.value.substring(0, start) + indent + sourceCodeEl.value.substring(end);
-      sourceCodeEl.selectionStart = sourceCodeEl.selectionEnd = start + indent.length;
-      updateLineNumbers(sourceCodeEl.value, sourceLinesEl);
-      updateStats(sourceCodeEl.value, sourceStatsEl);
-      saveState();
-    }
-  });
-
-  sourceCodeEl.addEventListener("input", () => {
-    updateLineNumbers(sourceCodeEl.value, sourceLinesEl);
-    updateStats(sourceCodeEl.value, sourceStatsEl);
+    renderStandaloneEditorHighlightAndLines();
     saveState();
-    if (!previewBox.classList.contains("hidden")) {
-      updatePreviewFrame();
-    }
-  });
-
-  sourceCodeEl.addEventListener("scroll", () => {
-    sourceLinesEl.scrollTop = sourceCodeEl.scrollTop;
-  });
-
-  highlightedOutputEl.addEventListener("scroll", () => {
-    targetLinesEl.scrollTop = highlightedOutputEl.scrollTop;
-  });
-
-  sourceLangEl.addEventListener("change", () => {
-    syncPreviewAvailability();
-    saveState();
-  });
-
-  targetLangEl.addEventListener("change", runTool);
-
-  pasteBtn.addEventListener("click", async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      sourceCodeEl.value = text;
-      updateLineNumbers(sourceCodeEl.value, sourceLinesEl);
-      updateStats(sourceCodeEl.value, sourceStatsEl);
-      saveState();
-      showToast(I18N[state.uiLang].pasted);
-    } catch {
-      sourceCodeEl.focus();
-    }
-  });
-
-  clearBtn.addEventListener("click", () => {
-    sourceCodeEl.value = "";
-    renderOutput("");
-    updateLineNumbers("", sourceLinesEl);
-    updateStats("", sourceStatsEl);
-    saveState();
-    showToast(I18N[state.uiLang].cleared);
-  });
-
-  copyBtn.addEventListener("click", async () => {
-    if (!targetCodeEl.value) return;
-    try {
-      await navigator.clipboard.writeText(targetCodeEl.value);
-      showToast(I18N[state.uiLang].copied);
-    } catch {
-      showToast("تعذر النسخ تلقائيًا");
-    }
-  });
-
-  downloadBtn.addEventListener("click", () => {
-    if (!targetCodeEl.value) return;
-    const blob = new Blob([targetCodeEl.value], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = getDownloadFilename();
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast(I18N[state.uiLang].downloaded);
-  });
-
-  themeToggle.addEventListener("click", () => {
-    applyTheme(state.theme === "dark" ? "light" : "dark");
-  });
-
-  langToggle.addEventListener("click", () => {
-    applyUiLanguage(state.uiLang === "ar" ? "en" : "ar");
-  });
-
-  if (web3Panel) {
-    web3Tabs.forEach((tab) => {
-      tab.addEventListener("click", () => {
-        renderWeb3Slot(Number(tab.dataset.w3));
-      });
-    });
-
-    web3NameInput?.addEventListener("input", (e) => {
-      web3Files[web3ActiveIndex].name = e.target.value;
-      saveWeb3Files();
-    });
-
-    web3Editor?.addEventListener("input", (e) => {
-      web3Files[web3ActiveIndex].code = e.target.value;
-      saveWeb3Files();
-    });
-
-    web3SampleBtn?.addEventListener("click", () => {
-      web3Files = [
-        {
-          name: "index.html",
-          code: '<div class="card">\n  <h3>ForDev Studio</h3>\n  <button>Start</button>\n</div>'
-        },
-        {
-          name: "style.css",
-          code: ".card {\n  padding: 16px;\n  border-radius: 12px;\n}"
-        },
-        {
-          name: "script.js",
-          code: "console.log('3 web files bundled');"
-        }
-      ];
-      saveWeb3Files();
-      renderWeb3Slot(web3ActiveIndex);
-    });
-
-    web3PackBtn?.addEventListener("click", () => {
-      const htmlCode = web3Files[0]?.code || "";
-      const cssCode = web3Files[1]?.code || "";
-      const jsCode = web3Files[2]?.code || "";
-
-      let combined = "";
-      if (state.toolId === "web-pack") {
-        combined = [
-          "<!DOCTYPE html>",
-          '<html lang="ar" dir="rtl">',
-          "<head>",
-          '  <meta charset="UTF-8" />',
-          '  <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
-          "  <title>ForDev Web App</title>",
-          "  <style>",
-          cssCode,
-          "  </style>",
-          "</head>",
-          "<body>",
-          htmlCode,
-          "  <script>",
-          jsCode,
-          "  </script>",
-          "</body>",
-          "</html>"
-        ].join("\n");
-      } else {
-        combined = web3Files
-          .map((f, i) => `/* --- FILE ${i + 1}: ${f.name || `file_${i + 1}`} --- */\n${f.code}`)
-          .join("\n\n");
-      }
-
-      sourceCodeEl.value = combined;
-      updateLineNumbers(sourceCodeEl.value, sourceLinesEl);
-      updateStats(sourceCodeEl.value, sourceStatsEl);
-      runTool();
-    });
-
-    loadWeb3Files();
-    renderWeb3Slot(0);
-  }
-
-  function insertAssetIntoWeb3(targetIndex, snippet, label) {
-    if (!snippet) return;
-    if (!WEB3_SUPPORTED_TOOLS.has(state.toolId)) {
-      selectTool("web-pack", false);
-    }
-    syncWeb3Visibility(state.toolId);
-
-    const currentCode = web3Files[targetIndex]?.code || "";
-    const separator = currentCode.trim() ? "\n\n" : "";
-    web3Files[targetIndex].code = `${currentCode}${separator}${snippet}`;
-    saveWeb3Files();
-
-    renderWeb3Slot(targetIndex);
-    isToolPageOpen = true;
-    syncHybridToolView();
-    if (typeof window.goToForDevSection === "function") {
-      window.goToForDevSection("tools");
-    }
-    showToast(`تم إدراج ${label} في ${web3Files[targetIndex].name}`);
-  }
-
-  function attachAssetActions(container = document) {
-    container.querySelectorAll(".asset-copy-btn").forEach((btn) => {
-      if (btn.dataset.boundCopy === "1") return;
-      btn.dataset.boundCopy = "1";
-      btn.addEventListener("click", async () => {
-        const text = btn.dataset.copy || "";
-        if (!text) return;
-        try {
-          await navigator.clipboard.writeText(text);
-          showToast(I18N[state.uiLang]?.copied || "تم النسخ");
-        } catch {
-          showToast("تعذر النسخ تلقائيًا");
-        }
-      });
-    });
-
-    container.querySelectorAll(".asset-insert-btn").forEach((btn) => {
-      if (btn.dataset.boundInsert === "1") return;
-      btn.dataset.boundInsert = "1";
-      btn.addEventListener("click", () => {
-        const text = btn.dataset.insert || "";
-        const targetIndex = Number(btn.dataset.targetSlot ?? 1);
-        const label = btn.dataset.label || "العنصر";
-        insertAssetIntoWeb3(targetIndex, text, label);
-      });
-    });
   }
 
   function isIllustrationIcon(icon) {
     const cat = String(icon?.category || "").toLowerCase();
     const title = String(icon?.title || "").toLowerCase();
-    return (
-      cat.includes("undraw") ||
-      cat.includes("illustration") ||
-      cat.includes("توضيح") ||
-      title.includes("توضيح") ||
-      title.includes("illustration")
-    );
+    return cat.includes("undraw") || cat.includes("illustration") || cat.includes("توضيح") || title.includes("توضيح");
   }
 
   function renderIconsList(iconsGridEl) {
     if (!iconsGridEl || !Array.isArray(window.ICONS_LIBRARY)) return;
-
-    const filtered = window.ICONS_LIBRARY.filter((icon) => {
-      const isIllus = isIllustrationIcon(icon);
-      return currentIconMode === "illustrations" ? isIllus : !isIllus;
-    });
-
+    const filtered = window.ICONS_LIBRARY.filter((icon) =>
+      currentIconMode === "illustrations" ? isIllustrationIcon(icon) : !isIllustrationIcon(icon)
+    );
     iconsGridEl.innerHTML = filtered
-      .map((icon) => {
-        const isIllus = isIllustrationIcon(icon);
-        return `
-          <div class="asset-card">
-            <div class="asset-preview ${isIllus ? "undraw-illustration-preview" : ""}">${icon.svg}</div>
-            <div class="asset-title">${icon.title}</div>
-            ${icon.category ? `<div class="asset-meta">${icon.category}</div>` : ""}
-            <div class="asset-actions">
-              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(icon.svg)}" data-encoded="1">نسخ SVG</button>
-              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(icon.svg)}" data-target-slot="0" data-label="الأيقونة (${icon.title})" data-encoded="1">إدراج HTML</button>
-            </div>
+      .map(
+        (icon) => `
+        <div class="asset-card">
+          <div class="asset-preview ${isIllustrationIcon(icon) ? "undraw-illustration-preview" : ""}">${icon.svg}</div>
+          <div class="asset-title">${icon.title}</div>
+          <div class="asset-actions">
+            <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(icon.svg)}" data-encoded="1">نسخ SVG</button>
+            <button type="button" class="asset-insert-btn" data-to-editor-code="${encodeURIComponent(icon.svg)}" data-to-editor-lang="html" data-to-editor-label="الأيقونة (${icon.title})" data-encoded="1">+ للمحرر</button>
           </div>
-        `;
-      })
+        </div>`
+      )
       .join("");
-
-    iconsGridEl.querySelectorAll('[data-encoded="1"]').forEach((btn) => {
-      if (btn.dataset.copy) btn.dataset.copy = decodeURIComponent(btn.dataset.copy);
-      if (btn.dataset.insert) btn.dataset.insert = decodeURIComponent(btn.dataset.insert);
-      btn.removeAttribute("data-encoded");
+    iconsGridEl.querySelectorAll('[data-encoded="1"]').forEach((b) => {
+      if (b.dataset.copy) b.dataset.copy = decodeURIComponent(b.dataset.copy);
+      if (b.dataset.toEditorCode) b.dataset.toEditorCode = decodeURIComponent(b.dataset.toEditorCode);
+      b.removeAttribute("data-encoded");
     });
-
-    attachAssetActions(iconsGridEl);
-    applyDesignAssetsLanguage(state.uiLang);
   }
 
   function renderDesignLibraries() {
-    const fontsGridEl =
-      document.querySelector('[data-page-key="fonts"] .asset-grid') ||
-      document.querySelector("#assetPanelFonts .asset-grid");
-    const iconsGridEl =
-      document.querySelector('[data-page-key="icons"] .asset-grid') ||
-      document.querySelector("#assetPanelIcons .asset-grid");
-    const backgroundsGridEl =
-      document.querySelector('[data-page-key="backgrounds"] .asset-grid') ||
-      document.querySelector("#assetPanelBackgrounds .asset-grid");
+    const fontsGrid = document.querySelector('[data-page-key="fonts"] .asset-grid');
+    const iconsGrid = document.querySelector('[data-page-key="icons"] .asset-grid');
+    const bgsGrid = document.querySelector('[data-page-key="backgrounds"] .asset-grid');
 
-    if (fontsGridEl && Array.isArray(window.FONTS_LIBRARY)) {
-      fontsGridEl.innerHTML = window.FONTS_LIBRARY.map(
-        (font) => `
-          <div class="asset-card">
-            <div class="asset-preview font-live-text" style="font-family: ${font.family};">${font.sample}</div>
-            <div class="asset-title">${font.title}</div>
-            ${font.category ? `<div class="asset-meta">${font.category}</div>` : ""}
-            <div class="asset-actions">
-              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(font.css)}" data-encoded="1">نسخ CSS</button>
-              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(font.css)}" data-target-slot="1" data-label="الخط (${font.title})" data-encoded="1">إدراج CSS</button>
-            </div>
+    if (fontsGrid && Array.isArray(window.FONTS_LIBRARY)) {
+      fontsGrid.innerHTML = window.FONTS_LIBRARY.map(
+        (f) => `
+        <div class="asset-card">
+          <div class="asset-preview font-live-text" style="font-family:${f.family};">${f.sample}</div>
+          <div class="asset-title">${f.title}</div>
+          <div class="asset-actions">
+            <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(f.css)}" data-encoded="1">نسخ CSS</button>
+            <button type="button" class="asset-insert-btn" data-to-editor-code="${encodeURIComponent(f.css)}" data-to-editor-lang="css" data-to-editor-label="الخط (${f.title})" data-encoded="1">+ للمحرر</button>
           </div>
-        `
+        </div>`
       ).join("");
+      fontsGrid.querySelectorAll('[data-encoded="1"]').forEach((b) => {
+        if (b.dataset.copy) b.dataset.copy = decodeURIComponent(b.dataset.copy);
+        if (b.dataset.toEditorCode) b.dataset.toEditorCode = decodeURIComponent(b.dataset.toEditorCode);
+        b.removeAttribute("data-encoded");
+      });
     }
 
-    if (iconsGridEl && Array.isArray(window.ICONS_LIBRARY)) {
-      renderIconsList(iconsGridEl);
-    }
+    if (iconsGrid && Array.isArray(window.ICONS_LIBRARY)) renderIconsList(iconsGrid);
 
-    if (backgroundsGridEl && Array.isArray(window.BACKGROUNDS_LIBRARY)) {
-      backgroundsGridEl.innerHTML = window.BACKGROUNDS_LIBRARY.map(
-        (bg) => `
-          <div class="asset-card">
-            <div class="asset-preview" style="${bg.previewStyle}"></div>
-            <div class="asset-title">${bg.title}</div>
-            ${bg.category ? `<div class="asset-meta">${bg.category}</div>` : ""}
-            <div class="asset-actions">
-              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(bg.css)}" data-encoded="1">نسخ CSS</button>
-              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(bg.css)}" data-target-slot="1" data-label="الخلفية (${bg.title})" data-encoded="1">إدراج CSS</button>
-            </div>
+    if (bgsGrid && Array.isArray(window.BACKGROUNDS_LIBRARY)) {
+      bgsGrid.innerHTML = window.BACKGROUNDS_LIBRARY.map(
+        (b) => `
+        <div class="asset-card">
+          <div class="asset-preview" style="${b.previewStyle}"></div>
+          <div class="asset-title">${b.title}</div>
+          <div class="asset-actions">
+            <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(b.css)}" data-encoded="1">نسخ CSS</button>
+            <button type="button" class="asset-insert-btn" data-to-editor-code="${encodeURIComponent(b.css)}" data-to-editor-lang="css" data-to-editor-label="الخلفية (${b.title})" data-encoded="1">+ للمحرر</button>
           </div>
-        `
+        </div>`
       ).join("");
+      bgsGrid.querySelectorAll('[data-encoded="1"]').forEach((b) => {
+        if (b.dataset.copy) b.dataset.copy = decodeURIComponent(b.dataset.copy);
+        if (b.dataset.toEditorCode) b.dataset.toEditorCode = decodeURIComponent(b.dataset.toEditorCode);
+        b.removeAttribute("data-encoded");
+      });
     }
-
-    const rootScope = document.getElementById("fordevHorizontalStage") || document;
-    rootScope.querySelectorAll('[data-encoded="1"]').forEach((btn) => {
-      if (btn.dataset.copy) btn.dataset.copy = decodeURIComponent(btn.dataset.copy);
-      if (btn.dataset.insert) btn.dataset.insert = decodeURIComponent(btn.dataset.insert);
-      btn.removeAttribute("data-encoded");
-    });
-
-    attachAssetActions(rootScope);
-    applyDesignAssetsLanguage(state.uiLang);
   }
 
-  document.addEventListener("click", (e) => {
-    if (e.target && e.target.id === "backToToolsBtn") {
-      closeToolSeparatePage();
+  document.addEventListener("click", async (e) => {
+    const lineNumEl = e.target.closest(".spck-line-num[data-line-idx]");
+    if (lineNumEl) {
+      const idx = Number(lineNumEl.dataset.lineIdx);
+      if (e.shiftKey && selectedLines.size > 0) {
+        const last = Array.from(selectedLines).pop();
+        for (let i = Math.min(last, idx); i <= Math.max(last, idx); i++) {
+          selectedLines.add(i);
+        }
+        renderStandaloneEditorHighlightAndLines();
+      } else {
+        toggleSelectLine(idx);
+      }
+      return;
+    }
+
+    const snipBtn = e.target.closest("[data-spck-insert]");
+    if (snipBtn) {
+      insertSnippetAtCursor(snipBtn.dataset.spckInsert);
+      return;
+    }
+
+    const acBtn = e.target.closest("[data-ac-idx]");
+    if (acBtn) {
+      const idx = Number(acBtn.dataset.acIdx);
+      if (currentSuggestions[idx]) applySuggestion(currentSuggestions[idx]);
+      return;
+    }
+
+    const toEditorBtn = e.target.closest("[data-to-editor-code]");
+    if (toEditorBtn) {
+      insertAssetIntoEditorDirect(
+        toEditorBtn.dataset.toEditorCode,
+        toEditorBtn.dataset.toEditorLabel || "عنصر",
+        toEditorBtn.dataset.toEditorLang || null
+      );
+      return;
+    }
+
+    const copyEl = e.target.closest(".asset-copy-btn");
+    if (copyEl && copyEl.dataset.copy) {
+      try {
+        await navigator.clipboard.writeText(copyEl.dataset.copy);
+        showToast(I18N[state.uiLang].copied);
+      } catch {
+        showToast("تعذر النسخ");
+      }
+      return;
+    }
+
+    const card = e.target.closest("[data-tool]");
+    if (card && card.dataset.tool) {
+      e.preventDefault();
+      selectTool(card.dataset.tool, true);
+      isToolPageOpen = true;
+      document.querySelector('.fordev-page-section[data-page-key="tools"]')?.classList.add("tool-detail-open");
       return;
     }
 
     const modeBtn = e.target.closest("[data-icon-mode]");
-    if (!modeBtn) return;
-
-    currentIconMode = modeBtn.dataset.iconMode || "standard";
-    document.querySelectorAll("[data-icon-mode]").forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.iconMode === currentIconMode);
-    });
-
-    const iconsGridEl =
-      document.querySelector('[data-page-key="icons"] .asset-grid') ||
-      document.querySelector("#assetPanelIcons .asset-grid");
-    renderIconsList(iconsGridEl);
-  });
-
-  document.addEventListener("input", (e) => {
-    if (e.target && e.target.id === "fontLiveSampleInput") {
-      const val = e.target.value.trim();
-      if (!val) return;
-      document.querySelectorAll(".font-live-text").forEach((el) => {
-        el.textContent = val;
-      });
+    if (modeBtn) {
+      currentIconMode = modeBtn.dataset.iconMode || "standard";
+      document.querySelectorAll("[data-icon-mode]").forEach((b) => b.classList.toggle("active", b.dataset.iconMode === currentIconMode));
+      renderIconsList(document.querySelector('[data-page-key="icons"] .asset-grid'));
     }
   });
 
-  // بناء الأقسام المستقلة الأفقية ولكل قسم فوتر خاص "طور بواسطة DOT" ونهاية واضحة
+  // بناء الأقسام الأفقية وجعل المحرر في المنتصف بين الخطوط والأيقونات
   (() => {
-    const navItems = document.querySelectorAll("[data-bnav]");
+    const bottomNav = document.querySelector(".bottom-nav");
     let stageEl = null;
     const sectionMap = {};
 
     function appendSectionFooter(sectionEl, extraClass = "") {
       if (!sectionEl) return;
-      const selector = extraClass ? `.section-end-footer.${extraClass}` : ".section-end-footer:not(.tool-detail-footer)";
-      if (sectionEl.querySelector(selector)) return;
-      const footer = document.createElement("footer");
-      footer.className = extraClass ? `section-end-footer ${extraClass}` : "section-end-footer";
-      footer.textContent = "طور بواسطة DOT";
-      sectionEl.appendChild(footer);
-    }
-
-    function placeWeb3InsideToolsPage(toolsPage) {
-      if (!web3Panel || !toolsPage) return;
-      const ws = toolsPage.querySelector(".workspace-wrapper") || toolsPage;
-      if (web3Panel.parentElement !== ws) {
-        ws.appendChild(web3Panel);
-      }
-      syncWeb3Visibility(state.toolId);
-    }
-
-    function ensureToolBackBar(workspaceSec) {
-      if (!workspaceSec || workspaceSec.querySelector(".tool-back-bar")) return;
-      const bar = document.createElement("div");
-      bar.className = "tool-back-bar";
-      bar.innerHTML = `<button type="button" id="backToToolsBtn" class="btn btn-secondary">← رجوع إلى الأدوات</button>`;
-      workspaceSec.insertBefore(bar, workspaceSec.firstChild);
+      const sel = extraClass ? `.section-end-footer.${extraClass}` : ".section-end-footer:not(.tool-detail-footer)";
+      if (sectionEl.querySelector(sel)) return;
+      const f = document.createElement("footer");
+      f.className = extraClass ? `section-end-footer ${extraClass}` : "section-end-footer";
+      f.textContent = "طور بواسطة DOT";
+      sectionEl.appendChild(f);
     }
 
     function createStandaloneAssetSection(key, titleAr, sourcePanel) {
@@ -1395,47 +1034,169 @@ ${html || "<main><h1>ForDev App</h1></main>"}
 
       const box = document.createElement("div");
       box.className = "design-assets-section";
-
-      const head = document.createElement("div");
-      head.className = "section-head";
-      head.innerHTML = `<h2>${titleAr}</h2>`;
-      box.appendChild(head);
+      box.innerHTML = `<div class="section-head"><h2>${titleAr}</h2></div>`;
 
       if (key === "fonts") {
-        const tester = document.createElement("div");
-        tester.className = "font-custom-tester";
-        tester.innerHTML = `<input id="fontLiveSampleInput" type="text" placeholder="اكتب نصًا لتجربة الخطوط مباشرة — ForDev Studio 2026" />`;
-        box.appendChild(tester);
+        box.innerHTML += `<div class="font-custom-tester"><input id="fontLiveSampleInput" type="text" placeholder="اكتب نصًا لتجربة الخطوط مباشرة — ForDev Studio 2026" /></div>`;
       }
 
       if (key === "icons") {
-        const filterBar = document.createElement("div");
-        filterBar.className = "icon-mode-tabs";
-        filterBar.innerHTML = `
-          <button type="button" class="icon-mode-btn active" data-icon-mode="standard">أيقونات عادية</button>
-          <button type="button" class="icon-mode-btn" data-icon-mode="illustrations">أيقونات توضيحية</button>
-        `;
-        box.appendChild(filterBar);
+        box.innerHTML += `
+          <div class="icon-mode-tabs">
+            <button type="button" class="icon-mode-btn active" data-icon-mode="standard">أيقونات عادية</button>
+            <button type="button" class="icon-mode-btn" data-icon-mode="illustrations">أيقونات توضيحية</button>
+          </div>`;
       }
 
-      const grid = sourcePanel ? sourcePanel.querySelector(".asset-grid") : null;
-      const newGrid = document.createElement("div");
-      newGrid.className = "asset-grid";
-      if (grid) {
-        newGrid.id = grid.id || "";
-        newGrid.innerHTML = grid.innerHTML;
+      const grid = document.createElement("div");
+      grid.className = "asset-grid";
+      if (sourcePanel?.querySelector(".asset-grid")) {
+        grid.innerHTML = sourcePanel.querySelector(".asset-grid").innerHTML;
       }
-      box.appendChild(newGrid);
+      box.appendChild(grid);
       sec.appendChild(box);
       appendSectionFooter(sec);
       return sec;
     }
 
-    function initHorizontalPages() {
-      if (stageEl && stageEl.isConnected) {
-        placeWeb3InsideToolsPage(sectionMap.tools);
-        return stageEl;
+    function createSpckEditorSection() {
+      const sec = document.createElement("section");
+      sec.className = "fordev-page-section";
+      sec.dataset.pageKey = "editor";
+
+      const langOpts = SUPPORTED_10_LANGS.map((l) => `<option value="${l.id}">${l.label}</option>`).join("");
+
+      sec.innerHTML = `
+        <div class="spck-editor-shell">
+          <div class="spck-top-bar">
+            <div class="spck-active-meta">
+              <span class="spck-dot"></span>
+              <strong id="spckActiveFileTitle">${escapeHtml(currentFile.name)}</strong>
+            </div>
+            <div class="spck-top-controls">
+              <select id="standaloneEditorLangSelect" class="spck-lang-select">${langOpts}</select>
+              <button type="button" id="standaloneNewFileBtn" class="spck-action-btn">ملف جديد</button>
+              <button type="button" id="standalonePreviewBtn" class="spck-run-btn">▶ معاينة</button>
+              <button type="button" id="standaloneExitToolBtn" class="spck-exit-btn">خروج من الأداة</button>
+            </div>
+          </div>
+
+          <div class="spck-selection-toolbar">
+            <button type="button" id="spckSelectLineBtn" class="spck-action-btn">تحديد سطر</button>
+            <button type="button" id="spckSelectRangeBtn" class="spck-action-btn">تحديد نطاق</button>
+            <button type="button" id="spckCopyLinesBtn" class="spck-action-btn">نسخ المحدد</button>
+            <button type="button" id="spckDeleteLinesBtn" class="spck-action-btn spck-danger-btn">حذف المحدد</button>
+            <button type="button" id="spckClearSelectBtn" class="spck-action-btn">إلغاء التحديد</button>
+          </div>
+
+          <div class="spck-code-area">
+            <div id="standaloneEditorLines" class="spck-line-gutter"><div class="spck-line-num">1</div></div>
+            <div class="spck-code-stack">
+              <div id="standaloneEditorHighlight" class="spck-highlight-view"></div>
+              <textarea id="sourceCode" class="spck-input-layer" spellcheck="false"></textarea>
+              <div id="editorAutocompleteBox" class="editor-autocomplete-box hidden"></div>
+            </div>
+          </div>
+
+          <div class="spck-quick-keys">
+            <button type="button" class="spck-key-btn" data-spck-insert="<div></div>">&lt;tag&gt;</button>
+            <button type="button" class="spck-key-btn" data-spck-insert="div">div</button>
+            <button type="button" class="spck-key-btn" data-spck-insert='class=""'>class</button>
+            <button type="button" class="spck-key-btn" data-spck-insert="=">=</button>
+            <button type="button" class="spck-key-btn" data-spck-insert='""'>""</button>
+            <button type="button" id="standaloneFoldBtn" class="spck-key-btn">طي الكتل</button>
+            <button type="button" id="standaloneAddIconBtn" class="spck-key-btn">+ أيقونة</button>
+            <button type="button" id="standaloneAddFontBtn" class="spck-key-btn">+ خط</button>
+            <button type="button" id="standaloneAddBgBtn" class="spck-key-btn">+ خلفية</button>
+            <button type="button" id="spckLeftBtn" class="spck-key-btn">◀</button>
+            <button type="button" id="spckRightBtn" class="spck-key-btn">▶</button>
+          </div>
+
+          <div class="spck-gemini-bar">
+            <input id="rbGeminiKey" type="password" dir="ltr" placeholder="Gemini API Key..." value="${escapeHtml(geminiApiKey)}" />
+            <button type="button" id="rbGeminiSaveBtn" class="spck-action-btn">حفظ</button>
+            <button type="button" id="rbGeminiFixBtn" class="spck-run-btn">فحص وتصحيح Gemini</button>
+          </div>
+
+          <div class="spck-status-bar">
+            <span id="standaloneEditorStats">${escapeHtml(currentFile.name)} | 1 سطر | 0 حرف</span>
+          </div>
+
+          <div id="standaloneLivePreviewBox" class="preview-section hidden">
+            <div class="preview-header">
+              <span>المعاينة المباشرة</span>
+              <button type="button" id="standaloneClosePreviewBtn" class="btn btn-secondary">إغلاق</button>
+            </div>
+            <iframe id="standaloneLiveFrame" class="preview-frame"></iframe>
+          </div>
+        </div>
+      `;
+
+      appendSectionFooter(sec);
+
+      sec.querySelector("#standaloneEditorLangSelect")?.addEventListener("change", (e) => {
+        currentFile.lang = e.target.value;
+        saveCurrentFile();
+        renderStandaloneEditorHighlightAndLines();
+      });
+
+      sec.querySelector("#standaloneNewFileBtn")?.addEventListener("click", () => {
+        const enteredName = window.prompt("اسم الملف الجديد (اختياري):", `file_${Date.now().toString().slice(-3)}.js`);
+        if (enteredName === null) return;
+        const extMatch = enteredName.trim().match(/\.([a-zA-Z0-9]+)$/);
+        const foundLang = extMatch
+          ? SUPPORTED_10_LANGS.find((l) => l.ext.toLowerCase() === extMatch[1].toLowerCase())?.id
+          : null;
+        openNewFile(foundLang || currentFile.lang, enteredName);
+      });
+
+      sec.querySelector("#standaloneExitToolBtn")?.addEventListener("click", exitCurrentToolOrEditor);
+      sec.querySelector("#spckSelectLineBtn")?.addEventListener("click", selectCurrentCursorLine);
+      sec.querySelector("#spckSelectRangeBtn")?.addEventListener("click", selectLineRangePrompt);
+      sec.querySelector("#spckCopyLinesBtn")?.addEventListener("click", copySelectedLines);
+      sec.querySelector("#spckDeleteLinesBtn")?.addEventListener("click", deleteSelectedLines);
+      sec.querySelector("#spckClearSelectBtn")?.addEventListener("click", clearSelectedLines);
+
+      sec.querySelector("#standalonePreviewBtn")?.addEventListener("click", openStandaloneLivePreview);
+      sec.querySelector("#standaloneClosePreviewBtn")?.addEventListener("click", () => {
+        sec.querySelector("#standaloneLivePreviewBox")?.classList.add("hidden");
+      });
+      sec.querySelector("#standaloneFoldBtn")?.addEventListener("click", toggleFoldBlocks);
+      sec.querySelector("#standaloneAddIconBtn")?.addEventListener("click", () => quickAddFirstAsset("icon"));
+      sec.querySelector("#standaloneAddFontBtn")?.addEventListener("click", () => quickAddFirstAsset("font"));
+      sec.querySelector("#standaloneAddBgBtn")?.addEventListener("click", () => quickAddFirstAsset("bg"));
+      sec.querySelector("#spckLeftBtn")?.addEventListener("click", () => moveCursorByChars(-1));
+      sec.querySelector("#spckRightBtn")?.addEventListener("click", () => moveCursorByChars(1));
+      sec.querySelector("#rbGeminiSaveBtn")?.addEventListener("click", () => {
+        saveGeminiKey(sec.querySelector("#rbGeminiKey")?.value || "");
+        showToast("تم حفظ المفتاح");
+      });
+      sec.querySelector("#rbGeminiFixBtn")?.addEventListener("click", fixCodeWithGemini);
+
+      return sec;
+    }
+
+    function ensureEditorNavButtonInCenter() {
+      if (!bottomNav) return;
+      let editorBtn = bottomNav.querySelector('[data-bnav="editor"]');
+      if (!editorBtn) {
+        editorBtn = document.createElement("button");
+        editorBtn.type = "button";
+        editorBtn.className = "bnav-item";
+        editorBtn.dataset.bnav = "editor";
+        editorBtn.innerHTML = `<span class="bnav-icon">&lt;/&gt;</span><span class="bnav-label">المحرر</span>`;
       }
+      // ترتيب الأزرار ليكون المحرر في المنتصف: [tools, fonts, editor, icons, backgrounds]
+      const orderedKeys = ["tools", "fonts", "editor", "icons", "backgrounds"];
+      orderedKeys.forEach((k) => {
+        const btn = k === "editor" ? editorBtn : bottomNav.querySelector(`[data-bnav="${k}"]`);
+        if (btn) bottomNav.appendChild(btn);
+      });
+    }
+
+    function initHorizontalPages() {
+      if (stageEl && stageEl.isConnected) return stageEl;
+      ensureEditorNavButtonInCenter();
 
       const navbar = document.querySelector(".navbar");
       const hero = document.querySelector(".hero-section");
@@ -1449,45 +1210,32 @@ ${html || "<main><h1>ForDev App</h1></main>"}
       const toolsPage = document.createElement("section");
       toolsPage.className = "fordev-page-section";
       toolsPage.dataset.pageKey = "tools";
-
       if (hero) toolsPage.appendChild(hero);
       if (toolsSec) toolsPage.appendChild(toolsSec);
-      if (workspaceSec) {
-        ensureToolBackBar(workspaceSec);
-        ensureRealBuildPanel(workspaceSec);
-        toolsPage.appendChild(workspaceSec);
-      }
-      placeWeb3InsideToolsPage(toolsPage);
+      if (workspaceSec) toolsPage.appendChild(workspaceSec);
       appendSectionFooter(toolsPage);
       appendSectionFooter(toolsPage, "tool-detail-footer");
 
-      const fontsPanel = document.getElementById("assetPanelFonts");
-      const iconsPanel = document.getElementById("assetPanelIcons");
-      const backgroundsPanel = document.getElementById("assetPanelBackgrounds");
-
-      const fontsPage = createStandaloneAssetSection("fonts", "مكتبة الخطوط", fontsPanel);
-      const iconsPage = createStandaloneAssetSection("icons", "مكتبة الأيقونات", iconsPanel);
-      const backgroundsPage = createStandaloneAssetSection("backgrounds", "مكتبة الخلفيات", backgroundsPanel);
+      const fontsPage = createStandaloneAssetSection("fonts", "مكتبة الخطوط", document.getElementById("assetPanelFonts"));
+      const editorPage = createSpckEditorSection();
+      const iconsPage = createStandaloneAssetSection("icons", "مكتبة الأيقونات", document.getElementById("assetPanelIcons"));
+      const backgroundsPage = createStandaloneAssetSection("backgrounds", "مكتبة الخلفيات", document.getElementById("assetPanelBackgrounds"));
 
       stage.appendChild(toolsPage);
       stage.appendChild(fontsPage);
+      stage.appendChild(editorPage);
       stage.appendChild(iconsPage);
       stage.appendChild(backgroundsPage);
 
-      if (assetsSec && assetsSec.parentElement) {
-        assetsSec.remove();
-      }
-
+      assetsSec?.remove();
       document.querySelectorAll("body > .site-footer").forEach((f) => f.remove());
 
-      if (navbar && navbar.nextSibling) {
-        navbar.parentElement.insertBefore(stage, navbar.nextSibling);
-      } else {
-        document.body.insertBefore(stage, document.body.firstChild);
-      }
+      if (navbar?.nextSibling) navbar.parentElement.insertBefore(stage, navbar.nextSibling);
+      else document.body.insertBefore(stage, document.body.firstChild);
 
       sectionMap.tools = toolsPage;
       sectionMap.fonts = fontsPage;
+      sectionMap.editor = editorPage;
       sectionMap.icons = iconsPage;
       sectionMap.backgrounds = backgroundsPage;
 
@@ -1496,7 +1244,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     }
 
     function setNavActive(key) {
-      navItems.forEach((item) => {
+      document.querySelectorAll("[data-bnav]").forEach((item) => {
         item.classList.toggle("active", item.dataset.bnav === key);
       });
     }
@@ -1505,21 +1253,13 @@ ${html || "<main><h1>ForDev App</h1></main>"}
       const stage = initHorizontalPages();
       const targetSec = sectionMap[key];
       if (!stage || !targetSec) return;
-
-      if (key === "tools") {
-        isToolPageOpen = false;
-        syncHybridToolView();
-      }
-
       setNavActive(key);
       targetSec.scrollTop = 0;
-
       requestAnimationFrame(() => {
         const isRtl = document.documentElement.dir === "rtl";
         const stageRect = stage.getBoundingClientRect();
         const secRect = targetSec.getBoundingClientRect();
         const delta = isRtl ? stageRect.right - secRect.right : secRect.left - stageRect.left;
-
         stage.scrollTo({
           top: 0,
           left: stage.scrollLeft + (isRtl ? -delta : delta),
@@ -1532,25 +1272,96 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     window.setForDevNavActive = setNavActive;
     window.goToForDevSection = goToSectionHorizontal;
 
-    navItems.forEach((item) => {
-      item.addEventListener("click", () => {
-        const key = item.dataset.bnav;
-        if (key) {
-          goToSectionHorizontal(key);
-        }
-      });
+    document.addEventListener("click", (e) => {
+      const navItem = e.target.closest("[data-bnav]");
+      if (!navItem) return;
+      const key = navItem.dataset.bnav;
+      if (!key) return;
+      if (key === "tools") {
+        isToolPageOpen = false;
+        document.querySelector('.fordev-page-section[data-page-key="tools"]')?.classList.remove("tool-detail-open");
+      }
+      goToSectionHorizontal(key);
     });
   })();
 
-  // التهيئة الأولية المرتبة
-  loadBuildConfig();
+  // التهيئة الأولية
+  loadGeminiKey();
+  loadCurrentFile();
   loadSavedState();
   applyTheme(state.theme);
+  window.initForDevPages();
+
+  const ta = getEditorTextarea();
+  if (ta) {
+    ta.addEventListener("input", () => {
+      currentFile.code = ta.value;
+      saveCurrentFile();
+      renderStandaloneEditorHighlightAndLines();
+      updateAutocompletePopup();
+      saveState();
+      if (!document.getElementById("standaloneLivePreviewBox")?.classList.contains("hidden")) {
+        openStandaloneLivePreview();
+      }
+    });
+
+    ta.addEventListener("select", syncSelectionFromTextareaRange);
+    ta.addEventListener("mouseup", syncSelectionFromTextareaRange);
+
+    ta.addEventListener("keydown", (e) => {
+      const acBox = document.getElementById("editorAutocompleteBox");
+      const acOpen = acBox && !acBox.classList.contains("hidden") && currentSuggestions.length > 0;
+      if (acOpen) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          selectedSuggestionIdx = (selectedSuggestionIdx + 1) % currentSuggestions.length;
+          updateAutocompletePopup();
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          selectedSuggestionIdx = (selectedSuggestionIdx - 1 + currentSuggestions.length) % currentSuggestions.length;
+          updateAutocompletePopup();
+          return;
+        }
+        if (e.key === "Tab" || e.key === "Enter") {
+          e.preventDefault();
+          applySuggestion(currentSuggestions[selectedSuggestionIdx]);
+          return;
+        }
+        if (e.key === "Escape") {
+          acBox.classList.add("hidden");
+          return;
+        }
+      }
+
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const s = ta.selectionStart;
+        const end = ta.selectionEnd;
+        ta.value = ta.value.slice(0, s) + "    " + ta.value.slice(end);
+        ta.selectionStart = ta.selectionEnd = s + 4;
+        currentFile.code = ta.value;
+        saveCurrentFile();
+        renderStandaloneEditorHighlightAndLines();
+        saveState();
+      }
+    });
+
+    ta.addEventListener("scroll", () => {
+      const hi = document.getElementById("standaloneEditorHighlight");
+      const ln = document.getElementById("standaloneEditorLines");
+      if (hi) {
+        hi.scrollTop = ta.scrollTop;
+        hi.scrollLeft = ta.scrollLeft;
+      }
+      if (ln) ln.scrollTop = ta.scrollTop;
+    });
+  }
+
+  syncEditorView();
   applyUiLanguage(state.uiLang);
   selectTool(state.toolId, true);
-  window.initForDevPages();
   window.setForDevNavActive("tools");
-  isToolPageOpen = false;
-  syncHybridToolView();
   renderDesignLibraries();
 })();
