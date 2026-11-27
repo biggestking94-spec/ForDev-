@@ -876,3 +876,75 @@ textarea,
   background: var(--accent-soft);
   color: var(--accent);
 }
+/* النظام الهجين: إخفاء مساحة العمل عند عرض قائمة الأدوات، وإظهارها كصفحة أداة منفصلة عند الفتح */
+.fordev-page-section[data-page-key="tools"]:not(.tool-detail-open) .workspace-wrapper,
+.fordev-page-section[data-page-key="tools"]:not(.tool-detail-open) #web3FilesMode,
+.fordev-page-section[data-page-key="tools"]:not(.tool-detail-open) .tool-detail-footer {
+  display: none !important;
+}
+
+.fordev-page-section[data-page-key="tools"].tool-detail-open .hero-section,
+.fordev-page-section[data-page-key="tools"].tool-detail-open .tools-section,
+.fordev-page-section[data-page-key="tools"].tool-detail-open > .section-end-footer {
+  display: none !important;
+}
+
+.tool-back-bar {
+  display: none;
+  margin-bottom: 0.75rem;
+}
+
+.fordev-page-section[data-page-key="tools"].tool-detail-open .tool-back-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.fordev-real-build-panel {
+  margin-top: 1rem;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.real-build-header h3 {
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.real-build-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.rb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.rb-field label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.rb-field input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-editor);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.real-build-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
