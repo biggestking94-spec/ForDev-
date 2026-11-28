@@ -2,7 +2,16 @@
   const STORAGE_KEY = "fordev_studio_state_v2";
   const WEB3_STORAGE_KEY = "fordev_v2_web3_files_v1";
   const BUILD_CFG_STORAGE_KEY = "fordev_v2_build_config_v1";
+  const EDITOR_STORAGE_KEY = "fordev_studio_pro_editor_v1";
   const WEB3_SUPPORTED_TOOLS = new Set(["web-to-app", "web-pack"]);
+
+  const QUICK_ICON_COLORS = [
+    { name: "سماوي", hex: "#38bdf8" },
+    { name: "أخضر", hex: "#34d399" },
+    { name: "أحمر", hex: "#f87171" },
+    { name: "ذهبي", hex: "#fbbf24" },
+    { name: "بنفسجي", hex: "#a78bfa" }
+  ];
 
   const toolsGrid = document.getElementById("toolsGrid");
   const activeToolBadge = document.getElementById("activeToolBadge");
@@ -62,9 +71,39 @@
 
   let web3Files = defaultWeb3Files();
   let web3ActiveIndex = 0;
-  let currentIconMode = "standard";
+  let currentBgTab = "backgrounds";
+  let currentIconColor = "#38bdf8";
   let isToolPageOpen = false;
   let buildConfig = defaultBuildConfig();
+
+  const searchQueries = {
+    templates: "",
+    designs: "",
+    backgrounds: ""
+  };
+
+  let proEditorView = null;
+  let proEditorFiles = {
+    "index.html": `<!DOCTYPE html>\n<html lang="ar" dir="rtl">\n<head>\n  <meta charset="UTF-8" />\n  <title>ForDev App</title>\n</head>\n<body>\n  <div class="box">\n    <h1>مرحبًا بك في ForDev Studio</h1>\n    <button id="runBtn" onclick="sayHi()">تشغيل</button>\n  </div>\n</body>\n</html>`,
+    "style.css": `.box {\n  padding: 24px;\n  border-radius: 16px;\n  background: linear-gradient(135deg, #0ea5e9, #2563eb);\n  color: #ffffff;\n}\n\nbutton {\n  padding: 10px 18px;\n  border: none;\n  border-radius: 10px;\n  cursor: pointer;\n}`,
+    "script.js": `function sayHi() {\n  const message = "أهلاً بك يا مطور في ForDev Studio";\n  console.log(message);\n  alert(message);\n}`,
+    "main.py": `def greet(user: str) -> str:\n    return f"مرحباً {user} في ForDev Studio"\n\nif __name__ == "__main__":\n    print(greet("DOT"))`
+  };
+  let proActiveFile = "index.html";
+
+  const getLibrary = () =>
+    window.ForDevAssetsLibrary || {
+      templates: [],
+      designs: [],
+      backgrounds: [],
+      illustrations: [],
+      buildColoredIconSvg: null,
+      search: (list, q) => {
+        const s = String(q || "").trim().toLowerCase();
+        if (!s) return list;
+        return list.filter((it) => `${it.title || ""} ${it.category || ""}`.toLowerCase().includes(s));
+      }
+    };
 
   let state = {
     toolId: "syntax",
@@ -78,7 +117,7 @@
       subtitle: "Developer Conversion & Packaging Hub",
       badge: "ForDev Studio v2.0",
       heroTitle: "أدوات عملية لتحويل الأكواد وتجهيز التطبيقات للمطورين",
-      heroDesc: "منصة متكاملة للمطورين تجمع بين تحويل صيغ الأكواد ونقل واجهات الويب إلى أطر التطبيقات، مع مكتبات الخطوط والأيقونات والخلفيات، ومعاينة حية، وحفظ تلقائي.",
+      heroDesc: "منصة متكاملة للمطورين تجمع بين تحويل صيغ الأكواد ونقل واجهات الويب إلى أطر التطبيقات، مع التصاميم والقوالب والخلفيات، ومعاينة حية، وحفظ تلقائي.",
       toolsHeading: "اختر الأداة المطلوبة",
       toolSyntaxTitle: "تحويل صيغ الأكواد",
       toolSyntaxDesc: "تحويل المنطق والدوال بين Python و JavaScript و JSON وغيرها بضغطة زر.",
@@ -99,22 +138,16 @@
       previewTitle: "المعاينة المباشرة (Live Preview)",
       notesTitle: "ملاحظات وإرشادات تقنية",
       developedBy: "طور بواسطة",
-      copied: "تم نسخ النتيجة إلى الحافظة",
+      copied: "تم نسخ الكود إلى الحافظة",
       pasted: "تم لصق الكود",
       cleared: "تم مسح المحرر",
       resetDone: "تمت إعادة ضبط الأداة",
       downloaded: "تم تنزيل الملف بنجاح",
-      fontSamplePlaceholder: "اكتب نصًا لتجربة الخطوط مباشرة — ForDev Studio 2026",
-      copyCss: "نسخ CSS",
-      copySvg: "نسخ SVG",
-      insertCss: "إدراج CSS",
-      insertHtml: "إدراج HTML",
       navTools: "الأدوات",
-      navFonts: "الخطوط",
-      navIcons: "الأيقونات",
+      navTemplates: "القوالب",
+      navDesigns: "التصاميم الجاهزة",
+      navEditor: "المحرر",
       navBackgrounds: "الخلفيات",
-      standardIconsBtn: "أيقونات عادية",
-      illustrationIconsBtn: "أيقونات توضيحية",
       backToTools: "← رجوع إلى الأدوات",
       buildTitle: "أداة البناء الحقيقية (Real Build)",
       buildAppNameLabel: "اسم التطبيق",
@@ -151,22 +184,16 @@
       previewTitle: "Live Preview",
       notesTitle: "Technical Notes & Guidelines",
       developedBy: "Developed by",
-      copied: "Output copied to clipboard",
+      copied: "Code copied to clipboard",
       pasted: "Code pasted",
       cleared: "Editor cleared",
       resetDone: "Tool reset to default",
       downloaded: "File downloaded successfully",
-      fontSamplePlaceholder: "Type text to preview fonts live — ForDev Studio 2026",
-      copyCss: "Copy CSS",
-      copySvg: "Copy SVG",
-      insertCss: "Insert CSS",
-      insertHtml: "Insert HTML",
       navTools: "Tools",
-      navFonts: "Fonts",
-      navIcons: "Icons",
+      navTemplates: "Templates",
+      navDesigns: "Ready Designs",
+      navEditor: "Editor",
       navBackgrounds: "Backgrounds",
-      standardIconsBtn: "Standard Icons",
-      illustrationIconsBtn: "Illustrations",
       backToTools: "← Back to Tools",
       buildTitle: "Real Build Engine",
       buildAppNameLabel: "App Name",
@@ -195,24 +222,98 @@
 
   window.showToast = showToast;
 
+  function ensureMiddleEditorIconAndOrder() {
+    const existingItem = document.querySelector("[data-bnav]");
+    const navBar =
+      (existingItem && existingItem.parentElement) ||
+      document.querySelector(".bottom-nav, nav.bottom-bar, .mobile-nav, footer nav");
+    if (!navBar) return;
+
+    navBar.classList.add("fordev-5-nav");
+    navBar.querySelectorAll('[data-bnav="fonts"], [data-bnav="icons"]').forEach((oldBtn) => oldBtn.remove());
+
+    const dict = I18N[state.uiLang] || I18N.ar;
+
+    const getOrCreateNavBtn = (key, label, svgInner) => {
+      let btn = navBar.querySelector(`[data-bnav="${key}"]`);
+      if (!btn) {
+        btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = existingItem
+          ? existingItem.className.replace(/\bactive\b/g, "").trim()
+          : "bnav-item";
+        btn.dataset.bnav = key;
+        btn.innerHTML = `
+          <span class="bnav-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              ${svgInner}
+            </svg>
+          </span>
+          <span class="bnav-label">${label}</span>
+        `;
+      } else {
+        btn.classList.remove("hidden");
+        btn.style.display = "";
+        const labelEl = btn.querySelector(".bnav-label") || btn.querySelector("span:last-child");
+        if (labelEl) labelEl.textContent = label;
+      }
+      return btn;
+    };
+
+    const templatesBtn = getOrCreateNavBtn(
+      "templates",
+      dict.navTemplates,
+      `<rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="8" height="6" rx="2"/><path d="M15 14h6"/><path d="M15 18h6"/>`
+    );
+
+    const designsBtn = getOrCreateNavBtn(
+      "designs",
+      dict.navDesigns,
+      `<path d="M12 2l2.6 5.4L20 10l-5.4 2.6L12 18l-2.6-5.4L4 10l5.4-2.6L12 2z"/><path d="M19 16v4"/><path d="M21 18h-4"/>`
+    );
+
+    const editorBtn = getOrCreateNavBtn(
+      "editor",
+      dict.navEditor,
+      `<path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m14 5-4 14"/>`
+    );
+
+    const toolsBtn = getOrCreateNavBtn(
+      "tools",
+      dict.navTools,
+      `<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>`
+    );
+
+    const backgroundsBtn = getOrCreateNavBtn(
+      "backgrounds",
+      dict.navBackgrounds,
+      `<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>`
+    );
+
+    [templatesBtn, designsBtn, editorBtn, toolsBtn, backgroundsBtn].forEach((btn) => {
+      navBar.appendChild(btn);
+    });
+
+    const stage = document.getElementById("fordevHorizontalStage") || document.body;
+    if (stage && !document.getElementById("fordevEditorSlot")) {
+      const emptySlot = document.createElement("div");
+      emptySlot.id = "fordevEditorSlot";
+      emptySlot.className = "fordev-editor-empty-slot";
+      stage.appendChild(emptySlot);
+    }
+  }
+
   function loadBuildConfig() {
     try {
       const raw = localStorage.getItem(BUILD_CFG_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        buildConfig = { ...defaultBuildConfig(), ...parsed };
-      }
-    } catch {
-      // تجاهل أخطاء التخزين
-    }
+      if (raw) buildConfig = { ...defaultBuildConfig(), ...JSON.parse(raw) };
+    } catch {}
   }
 
   function saveBuildConfig() {
     try {
       localStorage.setItem(BUILD_CFG_STORAGE_KEY, JSON.stringify(buildConfig));
-    } catch {
-      // تجاهل أخطاء السعة
-    }
+    } catch {}
   }
 
   function validateBuildInputs(cfg) {
@@ -553,11 +654,8 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     `;
 
     const notesSec = workspaceSec.querySelector(".notes-section");
-    if (notesSec) {
-      workspaceSec.insertBefore(panel, notesSec);
-    } else {
-      workspaceSec.appendChild(panel);
-    }
+    if (notesSec) workspaceSec.insertBefore(panel, notesSec);
+    else workspaceSec.appendChild(panel);
 
     const nameEl = panel.querySelector("#rbAppName");
     const pkgEl = panel.querySelector("#rbPkgId");
@@ -581,17 +679,14 @@ ${html || "<main><h1>ForDev App</h1></main>"}
       syncInputsToConfig();
       exportPwaBundleNow();
     });
-
     panel.querySelector("#rbBuildKotlinBtn")?.addEventListener("click", () => {
       syncInputsToConfig();
       exportKotlinWebViewNow();
     });
-
     panel.querySelector("#rbBuildSpecBtn")?.addEventListener("click", () => {
       syncInputsToConfig();
       exportPythonBuildFilesNow();
     });
-
     panel.querySelector("#rbBuildGhBtn")?.addEventListener("click", () => {
       syncInputsToConfig();
       exportGitHubWorkflowNow();
@@ -604,7 +699,6 @@ ${html || "<main><h1>ForDev App</h1></main>"}
       const el = document.getElementById(id);
       if (el) el.textContent = val;
     };
-
     setText("rbTitle", dict.buildTitle);
     setText("rbAppNameLbl", dict.buildAppNameLabel);
     setText("rbPkgLbl", dict.buildPkgLabel);
@@ -660,9 +754,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
           toolData: parsed.toolData && typeof parsed.toolData === "object" ? parsed.toolData : {}
         };
       }
-    } catch {
-      // تجاهل أخطاء التخزين
-    }
+    } catch {}
   }
 
   function saveState() {
@@ -674,17 +766,13 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // تجاهل أخطاء السعة
-    }
+    } catch {}
   }
 
   function saveWeb3Files() {
     try {
       localStorage.setItem(WEB3_STORAGE_KEY, JSON.stringify(web3Files));
-    } catch {
-      // تجاهل أخطاء السعة
-    }
+    } catch {}
   }
 
   function loadWeb3Files() {
@@ -698,9 +786,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
           code: typeof item?.code === "string" ? item.code : ""
         }));
       }
-    } catch {
-      // تجاهل أخطاء التخزين
-    }
+    } catch {}
   }
 
   function updateLineNumbers(text, linesEl) {
@@ -752,9 +838,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
   function syncPreviewAvailability() {
     const allowed = canPreviewCurrentTool();
     previewBtn.classList.toggle("hidden", !allowed);
-    if (!allowed) {
-      previewBox.classList.add("hidden");
-    }
+    if (!allowed) previewBox.classList.add("hidden");
   }
 
   function syncWeb3Visibility(toolId) {
@@ -776,9 +860,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     web3Files = defaultWeb3Files();
     try {
       localStorage.removeItem(WEB3_STORAGE_KEY);
-    } catch {
-      // تجاهل أخطاء التخزين
-    }
+    } catch {}
     renderWeb3Slot(0);
   }
 
@@ -805,11 +887,8 @@ ${html || "<main><h1>ForDev App</h1></main>"}
 
     syncPreviewAvailability();
 
-    if (autoRun) {
-      runTool();
-    } else if (savedTool?.targetCode !== undefined) {
-      renderOutput(savedTool.targetCode);
-    }
+    if (autoRun) runTool();
+    else if (savedTool?.targetCode !== undefined) renderOutput(savedTool.targetCode);
 
     saveState();
   }
@@ -826,9 +905,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     renderNotes(result.notes);
     saveState();
 
-    if (!previewBox.classList.contains("hidden")) {
-      updatePreviewFrame();
-    }
+    if (!previewBox.classList.contains("hidden")) updatePreviewFrame();
   }
 
   function updatePreviewFrame() {
@@ -843,69 +920,35 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     state.theme = theme;
     document.documentElement.setAttribute("data-theme", theme);
     if (theme === "light") {
-      sunIcon.classList.remove("hidden");
-      moonIcon.classList.add("hidden");
+      sunIcon?.classList.remove("hidden");
+      moonIcon?.classList.add("hidden");
     } else {
-      sunIcon.classList.add("hidden");
-      moonIcon.classList.remove("hidden");
+      sunIcon?.classList.add("hidden");
+      moonIcon?.classList.remove("hidden");
+    }
+    if (proEditorView) {
+      mountCodeEditorInstance(document.getElementById("fdProEditorHost"), proActiveFile);
     }
     saveState();
   }
 
   function applyDesignAssetsLanguage(lang) {
     const dict = I18N[lang] || I18N.ar;
-    const fontSampleInput = document.getElementById("fontLiveSampleInput");
     const backBtn = document.getElementById("backToToolsBtn");
-
-    if (fontSampleInput) {
-      fontSampleInput.placeholder = dict.fontSamplePlaceholder;
-    }
-
-    if (backBtn) {
-      backBtn.textContent = dict.backToTools;
-    }
-
-    document.querySelectorAll('[data-icon-mode="standard"]').forEach((btn) => {
-      btn.textContent = dict.standardIconsBtn;
-    });
-    document.querySelectorAll('[data-icon-mode="illustrations"]').forEach((btn) => {
-      btn.textContent = dict.illustrationIconsBtn;
-    });
-
-    document.querySelectorAll('[data-page-key="fonts"] .asset-copy-btn, #assetPanelFonts .asset-copy-btn').forEach((btn) => {
-      btn.textContent = dict.copyCss;
-    });
-    document.querySelectorAll('[data-page-key="fonts"] .asset-insert-btn, #assetPanelFonts .asset-insert-btn').forEach((btn) => {
-      btn.textContent = dict.insertCss;
-    });
-
-    document.querySelectorAll('[data-page-key="icons"] .asset-copy-btn, #assetPanelIcons .asset-copy-btn').forEach((btn) => {
-      btn.textContent = dict.copySvg;
-    });
-    document.querySelectorAll('[data-page-key="icons"] .asset-insert-btn, #assetPanelIcons .asset-insert-btn').forEach((btn) => {
-      btn.textContent = dict.insertHtml;
-    });
-
-    document.querySelectorAll('[data-page-key="backgrounds"] .asset-copy-btn, #assetPanelBackgrounds .asset-copy-btn').forEach((btn) => {
-      btn.textContent = dict.copyCss;
-    });
-    document.querySelectorAll('[data-page-key="backgrounds"] .asset-insert-btn, #assetPanelBackgrounds .asset-insert-btn').forEach((btn) => {
-      btn.textContent = dict.insertCss;
-    });
+    if (backBtn) backBtn.textContent = dict.backToTools;
 
     const navLabelMap = {
+      templates: dict.navTemplates,
+      designs: dict.navDesigns,
+      editor: dict.navEditor,
       tools: dict.navTools,
-      fonts: dict.navFonts,
-      icons: dict.navIcons,
       backgrounds: dict.navBackgrounds
     };
 
     document.querySelectorAll("[data-bnav]").forEach((item) => {
       const key = item.dataset.bnav;
       const labelEl = item.querySelector(".bnav-label");
-      if (labelEl && navLabelMap[key]) {
-        labelEl.textContent = navLabelMap[key];
-      }
+      if (labelEl && navLabelMap[key]) labelEl.textContent = navLabelMap[key];
     });
 
     applyRealBuildLanguage(lang);
@@ -915,13 +958,11 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     state.uiLang = lang;
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
-    langToggle.textContent = lang === "ar" ? "EN" : "عربي";
+    if (langToggle) langToggle.textContent = lang === "ar" ? "EN" : "عربي";
 
     document.querySelectorAll("[data-i18n]").forEach((el) => {
       const key = el.getAttribute("data-i18n");
-      if (I18N[lang] && I18N[lang][key]) {
-        el.textContent = I18N[lang][key];
-      }
+      if (I18N[lang] && I18N[lang][key]) el.textContent = I18N[lang][key];
     });
 
     const cfg = TOOLS_CONFIG[state.toolId];
@@ -932,6 +973,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
 
     updateStats(sourceCodeEl.value, sourceStatsEl);
     updateStats(targetCodeEl.value, targetStatsEl);
+    ensureMiddleEditorIconAndOrder();
     applyDesignAssetsLanguage(lang);
     saveState();
   }
@@ -954,18 +996,9 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     return map[targetLangEl.value] || "fordev-output.txt";
   }
 
-  if (toolsGrid) {
-    toolsGrid.addEventListener("click", (e) => {
-      const card = e.target.closest("[data-tool]");
-      if (card && card.dataset.tool) {
-        openToolSeparatePage(card.dataset.tool, true);
-      }
-    });
-  }
+  convertBtn?.addEventListener("click", runTool);
 
-  convertBtn.addEventListener("click", runTool);
-
-  swapBtn.addEventListener("click", () => {
+  swapBtn?.addEventListener("click", () => {
     const src = sourceLangEl.value;
     const tgt = targetLangEl.value;
     const hasSrcInTgt = [...targetLangEl.options].some((o) => o.value === src);
@@ -983,7 +1016,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     }
   });
 
-  sampleBtn.addEventListener("click", () => {
+  sampleBtn?.addEventListener("click", () => {
     const cfg = TOOLS_CONFIG[state.toolId];
     if (!cfg) return;
     sourceCodeEl.value = cfg.sample;
@@ -992,28 +1025,24 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     runTool();
   });
 
-  if (resetToolBtn) {
-    resetToolBtn.addEventListener("click", () => {
-      delete state.toolData[state.toolId];
-      if (WEB3_SUPPORTED_TOOLS.has(state.toolId)) {
-        resetWeb3Files();
-      }
-      selectTool(state.toolId, true);
-      showToast(I18N[state.uiLang].resetDone);
-    });
-  }
+  resetToolBtn?.addEventListener("click", () => {
+    delete state.toolData[state.toolId];
+    if (WEB3_SUPPORTED_TOOLS.has(state.toolId)) resetWeb3Files();
+    selectTool(state.toolId, true);
+    showToast(I18N[state.uiLang].resetDone);
+  });
 
-  previewBtn.addEventListener("click", () => {
+  previewBtn?.addEventListener("click", () => {
     if (!canPreviewCurrentTool()) return;
     previewBox.classList.remove("hidden");
     updatePreviewFrame();
   });
 
-  closePreviewBtn.addEventListener("click", () => {
+  closePreviewBtn?.addEventListener("click", () => {
     previewBox.classList.add("hidden");
   });
 
-  sourceCodeEl.addEventListener("keydown", (e) => {
+  sourceCodeEl?.addEventListener("keydown", (e) => {
     if (e.key === "Tab") {
       e.preventDefault();
       const start = sourceCodeEl.selectionStart;
@@ -1028,31 +1057,29 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     }
   });
 
-  sourceCodeEl.addEventListener("input", () => {
+  sourceCodeEl?.addEventListener("input", () => {
     updateLineNumbers(sourceCodeEl.value, sourceLinesEl);
     updateStats(sourceCodeEl.value, sourceStatsEl);
     saveState();
-    if (!previewBox.classList.contains("hidden")) {
-      updatePreviewFrame();
-    }
+    if (!previewBox.classList.contains("hidden")) updatePreviewFrame();
   });
 
-  sourceCodeEl.addEventListener("scroll", () => {
+  sourceCodeEl?.addEventListener("scroll", () => {
     sourceLinesEl.scrollTop = sourceCodeEl.scrollTop;
   });
 
-  highlightedOutputEl.addEventListener("scroll", () => {
+  highlightedOutputEl?.addEventListener("scroll", () => {
     targetLinesEl.scrollTop = highlightedOutputEl.scrollTop;
   });
 
-  sourceLangEl.addEventListener("change", () => {
+  sourceLangEl?.addEventListener("change", () => {
     syncPreviewAvailability();
     saveState();
   });
 
-  targetLangEl.addEventListener("change", runTool);
+  targetLangEl?.addEventListener("change", runTool);
 
-  pasteBtn.addEventListener("click", async () => {
+  pasteBtn?.addEventListener("click", async () => {
     try {
       const text = await navigator.clipboard.readText();
       sourceCodeEl.value = text;
@@ -1065,7 +1092,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     }
   });
 
-  clearBtn.addEventListener("click", () => {
+  clearBtn?.addEventListener("click", () => {
     sourceCodeEl.value = "";
     renderOutput("");
     updateLineNumbers("", sourceLinesEl);
@@ -1074,7 +1101,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     showToast(I18N[state.uiLang].cleared);
   });
 
-  copyBtn.addEventListener("click", async () => {
+  copyBtn?.addEventListener("click", async () => {
     if (!targetCodeEl.value) return;
     try {
       await navigator.clipboard.writeText(targetCodeEl.value);
@@ -1084,7 +1111,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     }
   });
 
-  downloadBtn.addEventListener("click", () => {
+  downloadBtn?.addEventListener("click", () => {
     if (!targetCodeEl.value) return;
     const blob = new Blob([targetCodeEl.value], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -1096,11 +1123,11 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     showToast(I18N[state.uiLang].downloaded);
   });
 
-  themeToggle.addEventListener("click", () => {
+  themeToggle?.addEventListener("click", () => {
     applyTheme(state.theme === "dark" ? "light" : "dark");
   });
 
-  langToggle.addEventListener("click", () => {
+  langToggle?.addEventListener("click", () => {
     applyUiLanguage(state.uiLang === "ar" ? "en" : "ar");
   });
 
@@ -1123,18 +1150,9 @@ ${html || "<main><h1>ForDev App</h1></main>"}
 
     web3SampleBtn?.addEventListener("click", () => {
       web3Files = [
-        {
-          name: "index.html",
-          code: '<div class="card">\n  <h3>ForDev Studio</h3>\n  <button>Start</button>\n</div>'
-        },
-        {
-          name: "style.css",
-          code: ".card {\n  padding: 16px;\n  border-radius: 12px;\n}"
-        },
-        {
-          name: "script.js",
-          code: "console.log('3 web files bundled');"
-        }
+        { name: "index.html", code: '<div class="card">\n  <h3>ForDev Studio</h3>\n  <button>Start</button>\n</div>' },
+        { name: "style.css", code: ".card {\n  padding: 16px;\n  border-radius: 12px;\n}" },
+        { name: "script.js", code: "console.log('3 web files bundled');" }
       ];
       saveWeb3Files();
       renderWeb3Slot(web3ActiveIndex);
@@ -1145,32 +1163,30 @@ ${html || "<main><h1>ForDev App</h1></main>"}
       const cssCode = web3Files[1]?.code || "";
       const jsCode = web3Files[2]?.code || "";
 
-      let combined = "";
-      if (state.toolId === "web-pack") {
-        combined = [
-          "<!DOCTYPE html>",
-          '<html lang="ar" dir="rtl">',
-          "<head>",
-          '  <meta charset="UTF-8" />',
-          '  <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
-          "  <title>ForDev Web App</title>",
-          "  <style>",
-          cssCode,
-          "  </style>",
-          "</head>",
-          "<body>",
-          htmlCode,
-          "  <script>",
-          jsCode,
-          "  </script>",
-          "</body>",
-          "</html>"
-        ].join("\n");
-      } else {
-        combined = web3Files
-          .map((f, i) => `/* --- FILE ${i + 1}: ${f.name || `file_${i + 1}`} --- */\n${f.code}`)
-          .join("\n\n");
-      }
+      const combined =
+        state.toolId === "web-pack"
+          ? [
+              "<!DOCTYPE html>",
+              '<html lang="ar" dir="rtl">',
+              "<head>",
+              '  <meta charset="UTF-8" />',
+              '  <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+              "  <title>ForDev Web App</title>",
+              "  <style>",
+              cssCode,
+              "  </style>",
+              "</head>",
+              "<body>",
+              htmlCode,
+              "  <script>",
+              jsCode,
+              "  </script>",
+              "</body>",
+              "</html>"
+            ].join("\n")
+          : web3Files
+              .map((f, i) => `/* --- FILE ${i + 1}: ${f.name || `file_${i + 1}`} --- */\n${f.code}`)
+              .join("\n\n");
 
       sourceCodeEl.value = combined;
       updateLineNumbers(sourceCodeEl.value, sourceLinesEl);
@@ -1231,151 +1247,425 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     });
   }
 
-  function isIllustrationIcon(icon) {
-    const cat = String(icon?.category || "").toLowerCase();
-    const title = String(icon?.title || "").toLowerCase();
-    return (
-      cat.includes("undraw") ||
-      cat.includes("illustration") ||
-      cat.includes("توضيح") ||
-      title.includes("توضيح") ||
-      title.includes("illustration")
-    );
+  function updateSectionCountBadge(sectionKey, count) {
+    const badge = document.querySelector(`[data-search-count="${sectionKey}"]`);
+    if (badge) badge.textContent = `${count} عنصر`;
   }
 
-  function renderIconsList(iconsGridEl) {
-    if (!iconsGridEl || !Array.isArray(window.ICONS_LIBRARY)) return;
+  function renderQuickIconColorSwatches() {
+    return `
+      <div class="quick-icon-colors" role="group" aria-label="ألوان سريعة للأيقونات">
+        ${QUICK_ICON_COLORS.map(
+          (c) => `
+          <button
+            type="button"
+            class="quick-color-dot ${currentIconColor.toLowerCase() === c.hex.toLowerCase() ? "active" : ""}"
+            data-icon-color="${c.hex}"
+            title="${c.name}"
+            style="background:${c.hex};"
+          ></button>
+        `
+        ).join("")}
+      </div>
+    `;
+  }
 
-    const filtered = window.ICONS_LIBRARY.filter((icon) => {
-      const isIllus = isIllustrationIcon(icon);
-      return currentIconMode === "illustrations" ? isIllus : !isIllus;
-    });
+  function renderBackgroundsSection() {
+    const bgGridEl = document.querySelector('[data-page-key="backgrounds"] .asset-grid');
+    if (!bgGridEl) return;
 
-    iconsGridEl.innerHTML = filtered
-      .map((icon) => {
-        const isIllus = isIllustrationIcon(icon);
-        return `
+    const lib = getLibrary();
+    const query = searchQueries.backgrounds || "";
+
+    if (currentBgTab === "illustrations") {
+      const items = lib.search(lib.illustrations || [], query);
+      updateSectionCountBadge("backgrounds", items.length);
+
+      bgGridEl.innerHTML = items.length
+        ? items
+            .map((item) => {
+              const svgStr =
+                typeof lib.buildColoredIconSvg === "function" && item.shape
+                  ? lib.buildColoredIconSvg(item.shape, currentIconColor)
+                  : item.svg || "";
+              return `
           <div class="asset-card">
-            <div class="asset-preview ${isIllus ? "undraw-illustration-preview" : ""}">${icon.svg}</div>
-            <div class="asset-title">${icon.title}</div>
-            ${icon.category ? `<div class="asset-meta">${icon.category}</div>` : ""}
+            <div class="asset-preview illustration-box">${svgStr}</div>
+            <div class="asset-title">${item.title}</div>
+            <div class="asset-meta">${item.category}</div>
+            <div class="icon-color-picker-row">
+              <label>لون الأيقونة:</label>
+              <input type="color" class="icon-custom-color-input" value="${currentIconColor}" aria-label="تغيير لون الأيقونة" />
+            </div>
+            ${renderQuickIconColorSwatches()}
             <div class="asset-actions">
-              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(icon.svg)}" data-encoded="1">نسخ SVG</button>
-              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(icon.svg)}" data-target-slot="0" data-label="الأيقونة (${icon.title})" data-encoded="1">إدراج HTML</button>
+              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(svgStr)}" data-encoded="1">نسخ SVG</button>
+              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(svgStr)}" data-target-slot="0" data-label="${item.title}" data-encoded="1">إدراج HTML</button>
             </div>
           </div>
         `;
-      })
-      .join("");
+            })
+            .join("")
+        : `<p class="empty-search-msg">لا توجد أيقونات توضيحية مطابقة للبحث.</p>`;
+    } else {
+      const items = lib.search(lib.backgrounds || [], query);
+      updateSectionCountBadge("backgrounds", items.length);
 
-    iconsGridEl.querySelectorAll('[data-encoded="1"]').forEach((btn) => {
-      if (btn.dataset.copy) btn.dataset.copy = decodeURIComponent(btn.dataset.copy);
-      if (btn.dataset.insert) btn.dataset.insert = decodeURIComponent(btn.dataset.insert);
-      btn.removeAttribute("data-encoded");
-    });
-
-    attachAssetActions(iconsGridEl);
-    applyDesignAssetsLanguage(state.uiLang);
-  }
-
-  function renderDesignLibraries() {
-    const fontsGridEl =
-      document.querySelector('[data-page-key="fonts"] .asset-grid') ||
-      document.querySelector("#assetPanelFonts .asset-grid");
-    const iconsGridEl =
-      document.querySelector('[data-page-key="icons"] .asset-grid') ||
-      document.querySelector("#assetPanelIcons .asset-grid");
-    const backgroundsGridEl =
-      document.querySelector('[data-page-key="backgrounds"] .asset-grid') ||
-      document.querySelector("#assetPanelBackgrounds .asset-grid");
-
-    if (fontsGridEl && Array.isArray(window.FONTS_LIBRARY)) {
-      fontsGridEl.innerHTML = window.FONTS_LIBRARY.map(
-        (font) => `
+      bgGridEl.innerHTML = items.length
+        ? items
+            .map(
+              (bg) => `
           <div class="asset-card">
-            <div class="asset-preview font-live-text" style="font-family: ${font.family};">${font.sample}</div>
-            <div class="asset-title">${font.title}</div>
-            ${font.category ? `<div class="asset-meta">${font.category}</div>` : ""}
-            <div class="asset-actions">
-              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(font.css)}" data-encoded="1">نسخ CSS</button>
-              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(font.css)}" data-target-slot="1" data-label="الخط (${font.title})" data-encoded="1">إدراج CSS</button>
+            <div class="asset-preview photo-preview-box">
+              <img src="${bg.imgUrl}" alt="${bg.title}" loading="lazy" />
             </div>
-          </div>
-        `
-      ).join("");
-    }
-
-    if (iconsGridEl && Array.isArray(window.ICONS_LIBRARY)) {
-      renderIconsList(iconsGridEl);
-    }
-
-    if (backgroundsGridEl && Array.isArray(window.BACKGROUNDS_LIBRARY)) {
-      backgroundsGridEl.innerHTML = window.BACKGROUNDS_LIBRARY.map(
-        (bg) => `
-          <div class="asset-card">
-            <div class="asset-preview" style="${bg.previewStyle}"></div>
             <div class="asset-title">${bg.title}</div>
             ${bg.category ? `<div class="asset-meta">${bg.category}</div>` : ""}
             <div class="asset-actions">
               <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(bg.css)}" data-encoded="1">نسخ CSS</button>
-              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(bg.css)}" data-target-slot="1" data-label="الخلفية (${bg.title})" data-encoded="1">إدراج CSS</button>
+              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(bg.css)}" data-target-slot="1" data-label="صورة الخلفية (${bg.title})" data-encoded="1">إدراج CSS</button>
             </div>
           </div>
         `
-      ).join("");
+            )
+            .join("")
+        : `<p class="empty-search-msg">لا توجد خلفيات مطابقة للبحث.</p>`;
     }
 
-    const rootScope = document.getElementById("fordevHorizontalStage") || document;
-    rootScope.querySelectorAll('[data-encoded="1"]').forEach((btn) => {
+    bgGridEl.querySelectorAll('[data-encoded="1"]').forEach((btn) => {
       if (btn.dataset.copy) btn.dataset.copy = decodeURIComponent(btn.dataset.copy);
       if (btn.dataset.insert) btn.dataset.insert = decodeURIComponent(btn.dataset.insert);
       btn.removeAttribute("data-encoded");
     });
 
-    attachAssetActions(rootScope);
+    attachAssetActions(bgGridEl);
+  }
+
+  function renderTemplatesSection() {
+    const gridEl = document.querySelector('[data-page-key="templates"] .asset-grid');
+    if (!gridEl) return;
+
+    const lib = getLibrary();
+    const items = lib.search(lib.templates || [], searchQueries.templates || "");
+    updateSectionCountBadge("templates", items.length);
+
+    gridEl.innerHTML = items.length
+      ? items
+          .map(
+            (tpl) => `
+          <div class="asset-card">
+            <div class="asset-preview">${tpl.previewHtml}</div>
+            <div class="asset-title">${tpl.title}</div>
+            <div class="asset-meta">${tpl.category}</div>
+            <div class="asset-actions">
+              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(tpl.code)}" data-encoded="1">نسخ الكود</button>
+              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(tpl.code)}" data-target-slot="${tpl.targetSlot}" data-label="${tpl.label}" data-encoded="1">إدراج</button>
+            </div>
+          </div>
+        `
+          )
+          .join("")
+      : `<p class="empty-search-msg">لا توجد قوالب مطابقة للبحث.</p>`;
+
+    gridEl.querySelectorAll('[data-encoded="1"]').forEach((btn) => {
+      if (btn.dataset.copy) btn.dataset.copy = decodeURIComponent(btn.dataset.copy);
+      if (btn.dataset.insert) btn.dataset.insert = decodeURIComponent(btn.dataset.insert);
+      btn.removeAttribute("data-encoded");
+    });
+
+    attachAssetActions(gridEl);
+  }
+
+  function renderDesignsSection() {
+    const gridEl = document.querySelector('[data-page-key="designs"] .asset-grid');
+    if (!gridEl) return;
+
+    const lib = getLibrary();
+    const items = lib.search(lib.designs || [], searchQueries.designs || "");
+    updateSectionCountBadge("designs", items.length);
+
+    gridEl.innerHTML = items.length
+      ? items
+          .map(
+            (dsn) => `
+          <div class="asset-card">
+            <div class="asset-preview">${dsn.previewHtml}</div>
+            <div class="asset-title">${dsn.title}</div>
+            <div class="asset-meta">${dsn.category}</div>
+            <div class="asset-actions">
+              <button type="button" class="asset-copy-btn" data-copy="${encodeURIComponent(dsn.code)}" data-encoded="1">نسخ الكود</button>
+              <button type="button" class="asset-insert-btn" data-insert="${encodeURIComponent(dsn.code)}" data-target-slot="${dsn.targetSlot}" data-label="${dsn.label}" data-encoded="1">إدراج</button>
+            </div>
+          </div>
+        `
+          )
+          .join("")
+      : `<p class="empty-search-msg">لا توجد تصاميم جاهزة مطابقة للبحث.</p>`;
+
+    gridEl.querySelectorAll('[data-encoded="1"]').forEach((btn) => {
+      if (btn.dataset.copy) btn.dataset.copy = decodeURIComponent(btn.dataset.copy);
+      if (btn.dataset.insert) btn.dataset.insert = decodeURIComponent(btn.dataset.insert);
+      btn.removeAttribute("data-encoded");
+    });
+
+    attachAssetActions(gridEl);
+  }
+
+  function renderDesignLibraries() {
+    renderTemplatesSection();
+    renderDesignsSection();
+    renderBackgroundsSection();
     applyDesignAssetsLanguage(state.uiLang);
   }
 
-  document.addEventListener("click", (e) => {
-    const card = e.target.closest("[data-tool]");
-    if (card && card.dataset.tool) {
-      e.preventDefault();
-      openToolSeparatePage(card.dataset.tool, true);
-      return;
+  function escapeCodeHtml(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function colorizeCodeText(code, filename = "") {
+    let html = escapeCodeHtml(code || "");
+    const ext = filename.split(".").pop().toLowerCase();
+
+    html = html.replace(/(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/)/g, '<span class="tok-comment">$1</span>');
+    html = html.replace(/("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)/g, '<span class="tok-str">$1</span>');
+
+    if (ext === "html" || ext === "htm") {
+      html = html.replace(/(&lt;\/?[a-zA-Z0-9:-]+)/g, '<span class="tok-tag">$1</span>');
     }
 
-    if (e.target && e.target.closest("#backToToolsBtn")) {
-      closeToolSeparatePage();
-      return;
+    const kwRegex = /\b(const|let|var|function|return|if|else|for|while|import|from|def|class|async|await|try|catch|new|export|default)\b/g;
+    html = html.replace(kwRegex, '<span class="tok-kw">$1</span>');
+    html = html.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="tok-num">$1</span>');
+
+    return html + "\n";
+  }
+
+  function syncColoredEditorOverlay(code, filename) {
+    const highlightLayer = document.getElementById("fdProEditorHighlight");
+    if (!highlightLayer) return;
+    highlightLayer.innerHTML = colorizeCodeText(code, filename);
+  }
+
+  function loadProEditorFiles() {
+    try {
+      const saved = localStorage.getItem(EDITOR_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === "object" && Object.keys(parsed).length) {
+          proEditorFiles = parsed;
+          proActiveFile = Object.keys(proEditorFiles)[0];
+        }
+      }
+    } catch {}
+  }
+
+  function saveProEditorFiles() {
+    try {
+      localStorage.setItem(EDITOR_STORAGE_KEY, JSON.stringify(proEditorFiles));
+    } catch {}
+  }
+
+  function getLangExtensionForFile(filename) {
+    const engine = window.ForDevCodeEngine;
+    if (!engine) return [];
+    const ext = filename.split(".").pop().toLowerCase();
+    if (ext === "html" || ext === "htm") return [engine.langs.html()];
+    if (ext === "css") return [engine.langs.css()];
+    if (ext === "js") return [engine.langs.javascript()];
+    if (ext === "py") return [engine.langs.python()];
+    return [];
+  }
+
+  function mountCodeEditorInstance(hostEl, filename) {
+    if (!hostEl) return;
+    const code = proEditorFiles[filename] ?? "";
+    const engine = window.ForDevCodeEngine;
+
+    if (proEditorView) {
+      proEditorView.destroy();
+      proEditorView = null;
     }
 
-    const modeBtn = e.target.closest("[data-icon-mode]");
-    if (!modeBtn) return;
+    hostEl.innerHTML = "";
 
-    currentIconMode = modeBtn.dataset.iconMode || "standard";
-    document.querySelectorAll("[data-icon-mode]").forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.iconMode === currentIconMode);
+    if (engine) {
+      const extensions = [
+        engine.basicSetup,
+        ...getLangExtensionForFile(filename),
+        engine.EditorView.updateListener.of((update) => {
+          if (update.docChanged) {
+            proEditorFiles[proActiveFile] = update.state.doc.toString();
+            saveProEditorFiles();
+          }
+        })
+      ];
+      if (state.theme !== "light") extensions.push(engine.oneDark);
+      proEditorView = new engine.EditorView({ doc: code, extensions, parent: hostEl });
+    } else {
+      const wrapper = document.createElement("div");
+      wrapper.className = "fd-colored-editor-wrap";
+
+      const pre = document.createElement("pre");
+      pre.id = "fdProEditorHighlight";
+      pre.className = "fd-colored-highlight";
+      pre.setAttribute("aria-hidden", "true");
+
+      const ta = document.createElement("textarea");
+      ta.className = "fordev-fallback-textarea fd-colored-textarea";
+      ta.value = code;
+      ta.spellcheck = false;
+
+      pre.innerHTML = colorizeCodeText(code, filename);
+
+      ta.addEventListener("input", () => {
+        proEditorFiles[proActiveFile] = ta.value;
+        saveProEditorFiles();
+        syncColoredEditorOverlay(ta.value, proActiveFile);
+      });
+
+      ta.addEventListener("scroll", () => {
+        pre.scrollTop = ta.scrollTop;
+        pre.scrollLeft = ta.scrollLeft;
+      });
+
+      wrapper.appendChild(pre);
+      wrapper.appendChild(ta);
+      hostEl.appendChild(wrapper);
+    }
+  }
+
+  function renderProEditorTabs() {
+    const tabsHost = document.getElementById("fdProEditorTabs");
+    if (!tabsHost) return;
+    tabsHost.innerHTML = Object.keys(proEditorFiles)
+      .map(
+        (fname) => `
+        <button type="button" class="fd-ed-tab ${fname === proActiveFile ? "active" : ""}" data-ed-file="${fname}">
+          ${fname}
+        </button>
+      `
+      )
+      .join("");
+  }
+
+  function initForDevProEditor() {
+    const slot = document.getElementById("fordevEditorSlot");
+    if (!slot || slot.dataset.initialized === "1") return;
+    slot.dataset.initialized = "1";
+
+    loadProEditorFiles();
+
+    slot.innerHTML = `
+      <div class="fd-pro-editor-shell">
+        <div class="fd-pro-editor-topbar">
+          <div class="fd-pro-editor-title">
+            <span>ForDev Code Editor</span>
+          </div>
+          <div class="fd-pro-editor-actions">
+            <button type="button" id="fdEdNewFileBtn" title="ملف جديد">+ ملف</button>
+            <button type="button" id="fdEdRunBtn" class="primary">▶ معاينة</button>
+            <button type="button" id="fdEdCopyBtn">نسخ</button>
+            <button type="button" id="fdEdDownloadBtn">تنزيل</button>
+            <button type="button" id="fdEdCloseBtn" title="إغلاق">✕</button>
+          </div>
+        </div>
+
+        <div class="fd-pro-editor-tabs" id="fdProEditorTabs"></div>
+
+        <div class="fd-pro-editor-body">
+          <div id="fdProEditorHost" class="fd-pro-editor-host"></div>
+          <div id="fdProEditorPreviewWrap" class="fd-pro-editor-preview hidden">
+            <div class="fd-preview-bar">
+              <span>المعاينة الحية</span>
+              <button type="button" id="fdEdClosePreviewBtn">إخفاء المعاينة</button>
+            </div>
+            <iframe id="fdProEditorPreviewFrame" sandbox="allow-scripts allow-modals"></iframe>
+          </div>
+        </div>
+      </div>
+    `;
+
+    renderProEditorTabs();
+    mountCodeEditorInstance(document.getElementById("fdProEditorHost"), proActiveFile);
+
+    slot.querySelector("#fdProEditorTabs")?.addEventListener("click", (e) => {
+      const tab = e.target.closest("[data-ed-file]");
+      if (!tab) return;
+      proActiveFile = tab.dataset.edFile;
+      renderProEditorTabs();
+      mountCodeEditorInstance(document.getElementById("fdProEditorHost"), proActiveFile);
     });
 
-    const iconsGridEl =
-      document.querySelector('[data-page-key="icons"] .asset-grid') ||
-      document.querySelector("#assetPanelIcons .asset-grid");
-    renderIconsList(iconsGridEl);
-  });
+    slot.querySelector("#fdEdNewFileBtn")?.addEventListener("click", () => {
+      const name = prompt("أدخل اسم الملف الجديد (مثال: app.js أو page.html):", "new.js");
+      if (!name || !name.trim()) return;
+      const clean = name.trim();
+      if (!(clean in proEditorFiles)) {
+        proEditorFiles[clean] = "";
+        saveProEditorFiles();
+      }
+      proActiveFile = clean;
+      renderProEditorTabs();
+      mountCodeEditorInstance(document.getElementById("fdProEditorHost"), proActiveFile);
+    });
 
-  document.addEventListener("input", (e) => {
-    if (e.target && e.target.id === "fontLiveSampleInput") {
-      const val = e.target.value.trim();
-      if (!val) return;
-      document.querySelectorAll(".font-live-text").forEach((el) => {
-        el.textContent = val;
-      });
-    }
-  });
+    slot.querySelector("#fdEdRunBtn")?.addEventListener("click", () => {
+      const previewWrap = document.getElementById("fdProEditorPreviewWrap");
+      const iframe = document.getElementById("fdProEditorPreviewFrame");
+      if (!previewWrap || !iframe) return;
 
-  // بناء الأقسام المستقلة الأفقية ولكل قسم فوتر خاص "طور بواسطة DOT" ونهاية واضحة
+      const html = proEditorFiles["index.html"] || "";
+      const css = proEditorFiles["style.css"] || "";
+      const js = proEditorFiles["script.js"] || "";
+
+      iframe.srcdoc = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>${css}</style>
+</head>
+<body>
+  ${html}
+  <script>${js}<\/script>
+</body>
+</html>`;
+
+      previewWrap.classList.remove("hidden");
+    });
+
+    slot.querySelector("#fdEdClosePreviewBtn")?.addEventListener("click", () => {
+      document.getElementById("fdProEditorPreviewWrap")?.classList.add("hidden");
+    });
+
+    slot.querySelector("#fdEdCopyBtn")?.addEventListener("click", async () => {
+      const text = proEditorFiles[proActiveFile] || "";
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("تم نسخ كود " + proActiveFile);
+      } catch {
+        showToast("تعذر النسخ");
+      }
+    });
+
+    slot.querySelector("#fdEdDownloadBtn")?.addEventListener("click", () => {
+      const text = proEditorFiles[proActiveFile] || "";
+      triggerFileDownload(proActiveFile, text);
+      showToast("تم تنزيل " + proActiveFile);
+    });
+
+    slot.querySelector("#fdEdCloseBtn")?.addEventListener("click", () => {
+      slot.classList.remove("editor-slot-open");
+      if (typeof window.goToForDevSection === "function") {
+        window.goToForDevSection("tools");
+      }
+    });
+  }
+
   (() => {
-    const navItems = document.querySelectorAll("[data-bnav]");
     let stageEl = null;
     const sectionMap = {};
 
@@ -1392,9 +1682,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     function placeWeb3InsideToolsPage(toolsPage) {
       if (!web3Panel || !toolsPage) return;
       const ws = toolsPage.querySelector(".workspace-wrapper") || toolsPage;
-      if (web3Panel.parentElement !== ws) {
-        ws.appendChild(web3Panel);
-      }
+      if (web3Panel.parentElement !== ws) ws.appendChild(web3Panel);
       syncWeb3Visibility(state.toolId);
     }
 
@@ -1406,7 +1694,18 @@ ${html || "<main><h1>ForDev App</h1></main>"}
       workspaceSec.insertBefore(bar, workspaceSec.firstChild);
     }
 
-    function createStandaloneAssetSection(key, titleAr, sourcePanel) {
+    function createSearchBar(key, placeholder) {
+      const bar = document.createElement("div");
+      bar.className = "section-search-bar";
+      bar.innerHTML = `
+        <input type="search" class="section-search-input" data-section-search="${key}" placeholder="${placeholder}" aria-label="${placeholder}" />
+        <button type="button" class="section-search-clear" data-clear-search="${key}" title="مسح البحث">✕</button>
+        <span class="section-search-count" data-search-count="${key}">100 عنصر</span>
+      `;
+      return bar;
+    }
+
+    function createCustomSection(key, titleAr, searchPlaceholder, withBgTabs = false) {
       const sec = document.createElement("section");
       sec.className = "fordev-page-section";
       sec.dataset.pageKey = key;
@@ -1419,31 +1718,22 @@ ${html || "<main><h1>ForDev App</h1></main>"}
       head.innerHTML = `<h2>${titleAr}</h2>`;
       box.appendChild(head);
 
-      if (key === "fonts") {
-        const tester = document.createElement("div");
-        tester.className = "font-custom-tester";
-        tester.innerHTML = `<input id="fontLiveSampleInput" type="text" placeholder="اكتب نصًا لتجربة الخطوط مباشرة — ForDev Studio 2026" />`;
-        box.appendChild(tester);
-      }
+      box.appendChild(createSearchBar(key, searchPlaceholder));
 
-      if (key === "icons") {
-        const filterBar = document.createElement("div");
-        filterBar.className = "icon-mode-tabs";
-        filterBar.innerHTML = `
-          <button type="button" class="icon-mode-btn active" data-icon-mode="standard">أيقونات عادية</button>
-          <button type="button" class="icon-mode-btn" data-icon-mode="illustrations">أيقونات توضيحية</button>
+      if (withBgTabs) {
+        const tabs = document.createElement("div");
+        tabs.className = "icon-mode-tabs";
+        tabs.innerHTML = `
+          <button type="button" class="icon-mode-btn active" data-bg-tab="backgrounds">الخلفيات</button>
+          <button type="button" class="icon-mode-btn" data-bg-tab="illustrations">أيقونات توضيحية</button>
         `;
-        box.appendChild(filterBar);
+        box.appendChild(tabs);
       }
 
-      const grid = sourcePanel ? sourcePanel.querySelector(".asset-grid") : null;
-      const newGrid = document.createElement("div");
-      newGrid.className = "asset-grid";
-      if (grid) {
-        newGrid.id = grid.id || "";
-        newGrid.innerHTML = grid.innerHTML;
-      }
-      box.appendChild(newGrid);
+      const grid = document.createElement("div");
+      grid.className = "asset-grid";
+      box.appendChild(grid);
+
       sec.appendChild(box);
       appendSectionFooter(sec);
       return sec;
@@ -1479,34 +1769,37 @@ ${html || "<main><h1>ForDev App</h1></main>"}
       appendSectionFooter(toolsPage);
       appendSectionFooter(toolsPage, "tool-detail-footer");
 
-      const fontsPanel = document.getElementById("assetPanelFonts");
-      const iconsPanel = document.getElementById("assetPanelIcons");
-      const backgroundsPanel = document.getElementById("assetPanelBackgrounds");
-
-      const fontsPage = createStandaloneAssetSection("fonts", "مكتبة الخطوط", fontsPanel);
-      const iconsPage = createStandaloneAssetSection("icons", "مكتبة الأيقونات", iconsPanel);
-      const backgroundsPage = createStandaloneAssetSection("backgrounds", "مكتبة الخلفيات", backgroundsPanel);
+      const templatesPage = createCustomSection(
+        "templates",
+        "القوالب والأكواد الجاهزة",
+        "ابحث في القوالب (رقم، اسم، HTML، CSS، JS، Python)..."
+      );
+      const designsPage = createCustomSection(
+        "designs",
+        "التصاميم الجاهزة",
+        "ابحث في التصاميم الجاهزة (رقم، اسم، Layout، Theme)..."
+      );
+      const backgroundsPage = createCustomSection(
+        "backgrounds",
+        "الخلفيات والأيقونات التوضيحية",
+        "ابحث في الخلفيات والأيقونات التوضيحية (رقم، اسم، SVG، صورة)...",
+        true
+      );
 
       stage.appendChild(toolsPage);
-      stage.appendChild(fontsPage);
-      stage.appendChild(iconsPage);
+      stage.appendChild(templatesPage);
+      stage.appendChild(designsPage);
       stage.appendChild(backgroundsPage);
 
-      if (assetsSec && assetsSec.parentElement) {
-        assetsSec.remove();
-      }
-
+      if (assetsSec && assetsSec.parentElement) assetsSec.remove();
       document.querySelectorAll("body > .site-footer").forEach((f) => f.remove());
 
-      if (navbar && navbar.nextSibling) {
-        navbar.parentElement.insertBefore(stage, navbar.nextSibling);
-      } else {
-        document.body.insertBefore(stage, document.body.firstChild);
-      }
+      if (navbar && navbar.nextSibling) navbar.parentElement.insertBefore(stage, navbar.nextSibling);
+      else document.body.insertBefore(stage, document.body.firstChild);
 
       sectionMap.tools = toolsPage;
-      sectionMap.fonts = fontsPage;
-      sectionMap.icons = iconsPage;
+      sectionMap.templates = templatesPage;
+      sectionMap.designs = designsPage;
       sectionMap.backgrounds = backgroundsPage;
 
       stageEl = stage;
@@ -1514,7 +1807,7 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     }
 
     function setNavActive(key) {
-      navItems.forEach((item) => {
+      document.querySelectorAll("[data-bnav]").forEach((item) => {
         item.classList.toggle("active", item.dataset.bnav === key);
       });
     }
@@ -1522,7 +1815,10 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     function goToSectionHorizontal(key) {
       const stage = initHorizontalPages();
       const targetSec = sectionMap[key];
-      if (!stage || !targetSec) return;
+      if (!stage || !targetSec) {
+        setNavActive(key);
+        return;
+      }
 
       setNavActive(key);
       targetSec.scrollTop = 0;
@@ -1544,24 +1840,93 @@ ${html || "<main><h1>ForDev App</h1></main>"}
     window.initForDevPages = initHorizontalPages;
     window.setForDevNavActive = setNavActive;
     window.goToForDevSection = goToSectionHorizontal;
-
-    navItems.forEach((item) => {
-      item.addEventListener("click", () => {
-        const key = item.dataset.bnav;
-        if (key && key !== "editor") {
-          if (key === "tools") {
-            closeToolSeparatePage();
-          }
-          goToSectionHorizontal(key);
-        }
-      });
-    });
   })();
 
-  // التهيئة الأولية المرتبة
+  document.addEventListener("input", (e) => {
+    const colorPicker = e.target.closest(".icon-custom-color-input");
+    if (colorPicker) {
+      currentIconColor = colorPicker.value || "#38bdf8";
+      renderBackgroundsSection();
+      return;
+    }
+
+    const searchInput = e.target.closest("[data-section-search]");
+    if (!searchInput) return;
+    const secKey = searchInput.dataset.sectionSearch;
+    searchQueries[secKey] = searchInput.value;
+
+    if (secKey === "templates") renderTemplatesSection();
+    else if (secKey === "designs") renderDesignsSection();
+    else if (secKey === "backgrounds") renderBackgroundsSection();
+  });
+
+  document.addEventListener("click", (e) => {
+    const clearSearchBtn = e.target.closest("[data-clear-search]");
+    if (clearSearchBtn) {
+      const secKey = clearSearchBtn.dataset.clearSearch;
+      searchQueries[secKey] = "";
+      const inputEl = document.querySelector(`[data-section-search="${secKey}"]`);
+      if (inputEl) inputEl.value = "";
+      if (secKey === "templates") renderTemplatesSection();
+      else if (secKey === "designs") renderDesignsSection();
+      else if (secKey === "backgrounds") renderBackgroundsSection();
+      return;
+    }
+
+    const quickColorBtn = e.target.closest("[data-icon-color]");
+    if (quickColorBtn) {
+      currentIconColor = quickColorBtn.dataset.iconColor || "#38bdf8";
+      renderBackgroundsSection();
+      return;
+    }
+
+    const navItem = e.target.closest("[data-bnav]");
+    if (navItem) {
+      const key = navItem.dataset.bnav;
+      if (!key) return;
+
+      if (key === "editor") {
+        window.setForDevNavActive?.("editor");
+        const slot = document.getElementById("fordevEditorSlot");
+        if (slot) slot.classList.add("editor-slot-open");
+        return;
+      }
+
+      const slot = document.getElementById("fordevEditorSlot");
+      if (slot) slot.classList.remove("editor-slot-open");
+
+      if (key === "tools") closeToolSeparatePage();
+      window.goToForDevSection?.(key);
+      return;
+    }
+
+    const bgTabBtn = e.target.closest("[data-bg-tab]");
+    if (bgTabBtn) {
+      currentBgTab = bgTabBtn.dataset.bgTab || "backgrounds";
+      document.querySelectorAll("[data-bg-tab]").forEach((b) => {
+        b.classList.toggle("active", b.dataset.bgTab === currentBgTab);
+      });
+      renderBackgroundsSection();
+      return;
+    }
+
+    const card = e.target.closest("[data-tool]");
+    if (card && card.dataset.tool) {
+      e.preventDefault();
+      openToolSeparatePage(card.dataset.tool, true);
+      return;
+    }
+
+    if (e.target.closest("#backToToolsBtn")) {
+      closeToolSeparatePage();
+    }
+  });
+
   loadBuildConfig();
   loadSavedState();
   applyTheme(state.theme);
+  ensureMiddleEditorIconAndOrder();
+  initForDevProEditor();
   applyUiLanguage(state.uiLang);
   selectTool(state.toolId, true);
   window.initForDevPages();
